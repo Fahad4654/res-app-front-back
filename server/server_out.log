@@ -1,0 +1,20 @@
+Server running on http://localhost:5000
+Register request body: {
+  name: 'Log Test',
+  email: 'logtest@example.com',
+  password: 'password123',
+  phoneNo: '5551234',
+  role: 'CUSTOMER'
+}
+Creating user with phoneNo: 5551234
+User created: {
+  id: 7,
+  email: 'logtest@example.com',
+  password: '$2b$10$5aVYqTvgzWHnJpzPL2cd2eyqMfZuFS3DTUZ5wOoWZg2BIi9F/cci.',
+  name: 'Log Test',
+  phoneNo: '5551234',
+  address: null,
+  profilePicture: null,
+  role: 'CUSTOMER',
+  createdAt: 2026-01-27T10:54:01.936Z
+}
