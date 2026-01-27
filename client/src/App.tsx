@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
 import type { MenuItem } from './services/api';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -111,6 +112,39 @@ function App() {
   return (
     <BrowserRouter>
       <AppContent />
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid rgba(212, 175, 55, 0.3)',
+            borderRadius: '12px',
+            padding: '16px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          success: {
+            iconTheme: {
+              primary: '#4caf50',
+              secondary: '#fff',
+            },
+            style: {
+              border: '1px solid rgba(76, 175, 80, 0.3)',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#f44336',
+              secondary: '#fff',
+            },
+            style: {
+              border: '1px solid rgba(244, 67, 54, 0.3)',
+            },
+          },
+        }}
+      />
     </BrowserRouter>
   );
 }

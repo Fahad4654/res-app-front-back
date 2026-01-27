@@ -21,6 +21,8 @@ import { getCurrentUser } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaEdit, FaTrash } from 'react-icons/fa';
+import ConfirmModal from './ConfirmModal';
+import InputModal from './InputModal';
 import '../styles/Admin.css';
 
 const AdminDashboard = () => {
@@ -61,6 +63,21 @@ const AdminDashboard = () => {
     // New User State
     const [newUser, setNewUser] = useState({
         name: '', email: '', password: '', role: 'CUSTOMER'
+    });
+
+    // Modal States
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '', 
+        onConfirm: () => {} 
+    });
+    const [inputModal, setInputModal] = useState<{ isOpen: boolean; title: string; message: string; defaultValue: string; onSubmit: (value: string) => void }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '', 
+        defaultValue: '',
+        onSubmit: () => {} 
     });
 
     const navigate = useNavigate();
@@ -202,62 +219,105 @@ const AdminDashboard = () => {
     // --- Actions ---
 
     const handleDeleteMenuItem = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this item?')) return;
-        try {
-            await deleteMenuItem(id);
-            setMenuItems(menuItems.filter(i => i.id !== id));
-            showMsg('success', 'Item deleted');
-        } catch (error) { showMsg('error', 'Failed to delete item'); }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Menu Item',
+            message: 'Are you sure you want to delete this item?',
+            onConfirm: async () => {
+                try {
+                    await deleteMenuItem(id);
+                    setMenuItems(menuItems.filter(i => i.id !== id));
+                    showMsg('success', 'Item deleted');
+                } catch (error) {
+                    showMsg('error', 'Failed to delete item');
+                }
+            }
+        });
     };
 
     const handleDeleteCategory = async (id: number) => {
-        if (!window.confirm('Deleting a category will NOT delete items in it. Proceed?')) return;
-        try {
-            await deleteCategory(id);
-            setCategories(categories.filter(c => c.id !== id));
-            showMsg('success', 'Category deleted');
-        } catch (error) { showMsg('error', 'Failed to delete category'); }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Category',
+            message: 'Deleting a category will NOT delete items in it. Proceed?',
+            onConfirm: async () => {
+                try {
+                    await deleteCategory(id);
+                    setCategories(categories.filter(c => c.id !== id));
+                    showMsg('success', 'Category deleted');
+                } catch (error) {
+                    showMsg('error', 'Failed to delete category');
+                }
+            }
+        });
     };
 
     const handleDeleteUser = async (id: number) => {
         const currentAdmin = getCurrentUser();
         if (currentAdmin?.id === id) return showMsg('error', "You can't delete yourself!");
-        if (!window.confirm('Delete this user account?')) return;
-        try {
-            await deleteUser(id);
-            setUsers(users.filter(u => u.id !== id));
-            showMsg('success', 'User deleted');
-        } catch (error) { showMsg('error', 'Failed to delete user'); }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete User',
+            message: 'Delete this user account?',
+            onConfirm: async () => {
+                try {
+                    await deleteUser(id);
+                    setUsers(users.filter(u => u.id !== id));
+                    showMsg('success', 'User deleted');
+                } catch (error) {
+                    showMsg('error', 'Failed to delete user');
+                }
+            }
+        });
     };
 
     const handleDeleteOrder = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
-        try {
-            await deleteOrder(id);
-            setOrders(orders.filter(o => o.id !== id));
-            showMsg('success', 'Order deleted');
-        } catch (error: any) {
-            showMsg('error', error.message || 'Failed to delete order');
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Order',
+            message: 'Are you sure you want to delete this order? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    await deleteOrder(id);
+                    setOrders(orders.filter(o => o.id !== id));
+                    showMsg('success', 'Order deleted');
+                } catch (error: any) {
+                    showMsg('error', error.message || 'Failed to delete order');
+                }
+            }
+        });
     };
 
     const handleStatusUpdate = async (id: number, status: string) => {
-        let estimatedTime;
         if (status === 'preparing') {
-            const time = window.prompt('Enter estimated preparation time in minutes:', '20');
-            if (time === null) return; // Cancelled
-            estimatedTime = parseInt(time);
-            if (isNaN(estimatedTime)) {
-                showMsg('error', 'Invalid time entered');
-                return;
+            setInputModal({
+                isOpen: true,
+                title: 'Set Preparation Time',
+                message: 'Enter estimated preparation time in minutes:',
+                defaultValue: '20',
+                onSubmit: async (time: string) => {
+                    const estimatedTime = parseInt(time);
+                    if (isNaN(estimatedTime)) {
+                        showMsg('error', 'Invalid time entered');
+                        return;
+                    }
+                    try {
+                        await updateOrderStatus(id, status, estimatedTime);
+                        loadAllData();
+                        showMsg('success', 'Order status updated');
+                    } catch (error) {
+                        showMsg('error', 'Failed to update status');
+                    }
+                }
+            });
+        } else {
+            try {
+                await updateOrderStatus(id, status);
+                loadAllData();
+                showMsg('success', 'Order status updated');
+            } catch (error) {
+                showMsg('error', 'Failed to update status');
             }
-        }
-        try {
-            await updateOrderStatus(id, status, estimatedTime);
-            loadAllData();
-            showMsg('success', 'Order status updated');
-        } catch (error) {
-            showMsg('error', 'Failed to update status');
         }
     };
 
@@ -685,6 +745,24 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+            />
+
+            <InputModal 
+                isOpen={inputModal.isOpen}
+                title={inputModal.title}
+                message={inputModal.message}
+                defaultValue={inputModal.defaultValue}
+                onSubmit={inputModal.onSubmit}
+                onCancel={() => setInputModal({ ...inputModal, isOpen: false })}
+                inputType="number"
+            />
         </div>
     );
 };

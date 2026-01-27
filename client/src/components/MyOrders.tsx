@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { fetchMyOrders, cancelOrder, deleteOrder } from '../services/api';
 import type { Order } from '../services/api';
 import { getCurrentUser } from '../services/auth';
 import { FaTrash } from 'react-icons/fa';
 import CountdownTimer from './CountdownTimer';
+import ConfirmModal from './ConfirmModal';
 import '../styles/Admin.css'; // Reusing admin table styles for consistency
 
 const MyOrders = () => {
@@ -12,6 +14,12 @@ const MyOrders = () => {
     const [ordersPage, setOrdersPage] = useState({ current: 1, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '', 
+        onConfirm: () => {} 
+    });
 
     const loadOrders = async (page = 1) => {
         try {
@@ -61,25 +69,37 @@ const MyOrders = () => {
     };
 
     const handleCancelOrder = async (id: number) => {
-        if (!window.confirm('Are you sure you want to cancel this order?')) return;
-        try {
-            await cancelOrder(id);
-            // Refresh orders
-            loadOrders(ordersPage.current);
-        } catch (error: any) {
-            alert(error.message || 'Failed to cancel order');
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Cancel Order',
+            message: 'Are you sure you want to cancel this order?',
+            onConfirm: async () => {
+                try {
+                    await cancelOrder(id);
+                    loadOrders(ordersPage.current);
+                    toast.success('Order cancelled successfully');
+                } catch (error: any) {
+                    toast.error(error.message || 'Failed to cancel order');
+                }
+            }
+        });
     };
 
     const handleDeleteOrder = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
-        try {
-            await deleteOrder(id);
-            // Refresh orders
-            loadOrders(ordersPage.current);
-        } catch (error: any) {
-            alert(error.message || 'Failed to delete order');
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Order',
+            message: 'Are you sure you want to delete this order? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    await deleteOrder(id);
+                    loadOrders(ordersPage.current);
+                    toast.success('Order deleted successfully');
+                } catch (error: any) {
+                    toast.error(error.message || 'Failed to delete order');
+                }
+            }
+        });
     };
 
     const Pagination = ({ current, totalPages, onPageChange }: { current: number, totalPages: number, onPageChange: (p: number) => void }) => {
@@ -242,6 +262,14 @@ const MyOrders = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+            />
         </div>
     );
 };
