@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchMyOrders, cancelOrder, deleteOrder } from '../services/api';
 import type { Order } from '../services/api';
 import { getCurrentUser } from '../services/auth';
-import { FaTrash, FaClock } from 'react-icons/fa';
+import { FaTrash } from 'react-icons/fa';
 import CountdownTimer from './CountdownTimer';
 import '../styles/Admin.css'; // Reusing admin table styles for consistency
 

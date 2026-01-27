@@ -538,7 +538,8 @@ app.post('/api/orders', async (req: Request, res: Response) => {
         total: Number(order.total),
         items: items as any[],
         customer: customer as any,
-        date: order.date.toISOString()
+        date: order.date.toISOString(),
+        estimatedReadyAt: order.estimatedReadyAt?.toISOString()
     };
     sendOrderConfirmation(emailOrder).catch(err => console.error('Failed to send confirmation email:', err));
     sendAdminNotification(emailOrder).catch(err => console.error('Failed to send admin notification:', err));
@@ -726,7 +727,8 @@ setInterval(async () => {
                 total: Number(order.total),
                 items: order.items as any[],
                 customer: order.customer as any,
-                date: order.date.toISOString()
+                date: order.date.toISOString(),
+                estimatedReadyAt: order.estimatedReadyAt?.toISOString()
             }).catch(err => console.error('Failed to send auto-status update email:', err));
         }
     } catch (error) {
