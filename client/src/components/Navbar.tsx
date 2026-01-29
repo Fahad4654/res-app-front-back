@@ -80,7 +80,21 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>Home</Link>
             <Link to="/menu" onClick={() => setMobileMenuOpen(false)}>Menu</Link>
             <Link to="/about" onClick={() => setMobileMenuOpen(false)}>About</Link>
-            {!user && <Link to="/login" onClick={() => setMobileMenuOpen(false)}>Login</Link>}
+            {user ? (
+              <>
+                <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
+                {user.role === 'ADMIN' && <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>}
+                <Link to="/my-orders" onClick={() => setMobileMenuOpen(false)}>My Orders</Link>
+                <button 
+                  onClick={() => { handleLogout(); setMobileMenuOpen(false); }} 
+                  className="mobile-menu-logout"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link to="/login" onClick={() => setMobileMenuOpen(false)}>Login</Link>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

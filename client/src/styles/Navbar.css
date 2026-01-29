@@ -110,6 +110,24 @@
   font-size: clamp(0.9rem, 2vw, 1rem);
 }
 
+.mobile-menu-logout {
+  padding: clamp(0.75rem, 2vh, 1rem);
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  background: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+  text-align: center;
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s;
+}
+
+.mobile-menu-logout:hover {
+  background: rgba(244, 67, 54, 0.2);
+}
+
 @media (min-width: 768px) {
   .desktop-links {
     display: flex;

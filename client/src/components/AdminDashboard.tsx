@@ -487,7 +487,7 @@ const AdminDashboard = () => {
 
             {/* MENU TAB */}
             {activeTab === 'menu' && (
-                <div className="admin-grid-two-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
+                <div className="admin-grid-two-cols">
                     <div className="admin-card">
                         <h3>{editingItem ? 'Edit Menu Item' : 'Add New Item'}</h3>
                         <form onSubmit={handleMenuSubmit} className="admin-form">
@@ -583,7 +583,7 @@ const AdminDashboard = () => {
 
             {/* USERS TAB */}
             {activeTab === 'users' && (
-                <div className="admin-grid-two-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
+                <div className="admin-grid-two-cols">
                     <div className="admin-card">
                         <h3>Create New User</h3>
                         <form onSubmit={handleUserSubmit} className="admin-form">
@@ -664,7 +664,7 @@ const AdminDashboard = () => {
 
             {/* CATEGORIES TAB */}
             {activeTab === 'categories' && (
-                <div className="admin-grid-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div className="admin-grid-two-cols">
                     <div className="admin-card">
                         <h3>{editingItem ? 'Edit Category' : 'New Category'}</h3>
                         <form onSubmit={handleCategorySubmit} className="admin-form">
