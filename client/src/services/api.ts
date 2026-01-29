@@ -29,7 +29,7 @@ export interface Order {
   estimatedReadyAt?: string;
   user?: User;
   kitchenStaff?: { name: string };
-  deliveryStaff?: { name: string };
+  deliveryStaff?: { name: string; phoneNo?: string };
 }
 
 export interface Category {

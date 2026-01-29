@@ -189,8 +189,14 @@ const MyOrders = () => {
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <span className={`status-badge status-${(order.status || 'pending').toLowerCase()}`}>
-                                                    {order.status}
+                                                    {(order.status || '').replace(/_/g, ' ').toUpperCase()}
                                                 </span>
+                                                {order.status === 'out_for_delivery' && order.deliveryStaff && (
+                                                    <div style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#ff9800', display: 'flex', flexDirection: 'column' }}>
+                                                        <span>Delivery by: {order.deliveryStaff.name}</span>
+                                                        {order.deliveryStaff.phoneNo && <span>{order.deliveryStaff.phoneNo}</span>}
+                                                    </div>
+                                                )}
                                                 {order.status === 'preparing' && order.estimatedReadyAt && (
                                                     <CountdownTimer 
                                                         targetDate={order.estimatedReadyAt} 

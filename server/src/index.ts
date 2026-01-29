@@ -766,7 +766,11 @@ app.get('/api/orders/my-orders', authenticateToken, async (req: Request, res: Re
                 where: { userId },
                 orderBy: { [sortBy]: sortOrder },
                 skip,
-                take: limit
+                take: limit,
+                include: {
+                    kitchenStaff: { select: { name: true } },
+                    deliveryStaff: { select: { name: true, phoneNo: true } }
+                }
             }),
             prisma.order.count({ where: { userId } })
         ]);

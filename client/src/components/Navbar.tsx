@@ -49,6 +49,9 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
               <span className="user-welcome">Hi, {user.name}</span>
               <Link to="/profile" className="nav-link">Profile</Link>
               {user.role === 'ADMIN' && <Link to="/admin" className="nav-link">Dashboard</Link>}
+              {user.role === 'KITCHEN_STAFF' && <Link to="/kitchen" className="nav-link">Kitchen</Link>}
+              {user.role === 'DELIVERY_STAFF' && <Link to="/delivery" className="nav-link">Delivery</Link>}
+              {user.role === 'CUSTOMER_SUPPORT' && <Link to="/support" className="nav-link">Support</Link>}
               <Link to="/my-orders" className="nav-link">My Orders</Link>
               <button onClick={handleLogout} className="btn-small" style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '4px', color: '#fff', background: 'transparent', cursor: 'pointer' }}>Logout</button>
             </div>
@@ -84,6 +87,9 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
               <>
                 <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
                 {user.role === 'ADMIN' && <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>}
+                {user.role === 'KITCHEN_STAFF' && <Link to="/kitchen" onClick={() => setMobileMenuOpen(false)}>Kitchen</Link>}
+                {user.role === 'DELIVERY_STAFF' && <Link to="/delivery" onClick={() => setMobileMenuOpen(false)}>Delivery</Link>}
+                {user.role === 'CUSTOMER_SUPPORT' && <Link to="/support" onClick={() => setMobileMenuOpen(false)}>Support</Link>}
                 <Link to="/my-orders" onClick={() => setMobileMenuOpen(false)}>My Orders</Link>
                 <button 
                   onClick={() => { handleLogout(); setMobileMenuOpen(false); }} 

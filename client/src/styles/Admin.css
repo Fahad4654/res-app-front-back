@@ -69,6 +69,7 @@
 .status-preparing { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
 .status-ready { background: rgba(103, 58, 183, 0.2); color: #673ab7; }
 .status-delivered { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.status-out_for_delivery { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
 .status-cancelled { background: rgba(244, 67, 54, 0.2); color: #f44336; }
 
 .status-select {
