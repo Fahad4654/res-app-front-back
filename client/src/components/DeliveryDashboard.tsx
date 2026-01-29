@@ -6,11 +6,18 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { FaPhone, FaMapMarkerAlt, FaCheck, FaMotorcycle } from 'react-icons/fa';
+import ConfirmModal from './ConfirmModal';
 import '../styles/Delivery.css';
 
 const DeliveryDashboard = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '', 
+        onConfirm: () => {} 
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -44,17 +51,22 @@ const DeliveryDashboard = () => {
     };
 
     const handleDeliveryComplete = async (id: number) => {
-        try {
-            if (!window.confirm('Confirm delivery complete?')) return;
-            
-            await updateOrderStatus(id, 'delivered');
-            toast.success('Order delivered!');
-            setOrders(orders.filter(o => o.id !== id)); // Optimistic remove
-            fetchDeliveryOrders();
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to update status');
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Complete Delivery',
+            message: 'Confirm delivery complete?',
+            onConfirm: async () => {
+                try {
+                    await updateOrderStatus(id, 'delivered');
+                    toast.success('Order delivered!');
+                    setOrders(orders.filter(o => o.id !== id)); // Optimistic remove
+                    fetchDeliveryOrders();
+                } catch (error) {
+                    console.error(error);
+                    toast.error('Failed to update status');
+                }
+            }
+        });
     };
 
     const readyOrders = orders.filter(o => o.status === 'ready');
@@ -113,6 +125,17 @@ const DeliveryDashboard = () => {
                     </section>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={() => {
+                    confirmModal.onConfirm();
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                }}
+                onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

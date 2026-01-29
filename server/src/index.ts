@@ -150,7 +150,13 @@ app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), asy
                 where,
                 orderBy,
                 skip,
-                take: limit
+                take: limit,
+                include: {
+                    user: { select: { name: true, phoneNo: true } },
+                    // customer is a JSON field, so it is returned by default
+                    kitchenStaff: { select: { name: true } },
+                    deliveryStaff: { select: { name: true } }
+                }
             }),
             prisma.order.count({ where })
         ]);

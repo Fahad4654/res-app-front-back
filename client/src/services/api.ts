@@ -28,6 +28,8 @@ export interface Order {
   date?: string;
   estimatedReadyAt?: string;
   user?: User;
+  kitchenStaff?: { name: string };
+  deliveryStaff?: { name: string };
 }
 
 export interface Category {
