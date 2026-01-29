@@ -35,7 +35,7 @@ const KitchenDashboard = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:5000/api/orders/kitchen', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/orders/kitchen`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
