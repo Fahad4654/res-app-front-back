@@ -2,12 +2,13 @@ import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import authRoutes from './routes/auth.js';
 import { authenticateToken, requireAdmin, AuthRequest } from './middleware/auth.js';
+import { checkPermission, clearPermissionCache } from './middleware/permissions.js';
 
 import multer from 'multer';
 import path from 'path';
@@ -40,8 +41,89 @@ const upload = multer({ storage });
 
 app.use('/api/auth', authRoutes);
 
-// Admin: Get All Orders with Pagination
-app.get('/api/orders', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+// ===== PERMISSIONS API =====
+
+// Get all permissions (Admin only)
+app.get('/api/permissions', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const permissions = await prisma.permission.findMany({
+            orderBy: [
+                { role: 'asc' },
+                { resource: 'asc' },
+                { action: 'asc' }
+            ]
+        });
+        res.json(permissions);
+    } catch (error) {
+        console.error('Error fetching permissions:', error);
+        res.status(500).json({ error: 'Failed to fetch permissions' });
+    }
+});
+
+// Get permissions for a specific role
+app.get('/api/permissions/:role', authenticateToken, async (req: Request, res: Response) => {
+    const { role } = req.params;
+    
+    try {
+        const permissions = await prisma.permission.findMany({
+            where: { role: role as any },
+            orderBy: [
+                { resource: 'asc' },
+                { action: 'asc' }
+            ]
+        });
+        res.json(permissions);
+    } catch (error) {
+        console.error('Error fetching role permissions:', error);
+        res.status(500).json({ error: 'Failed to fetch role permissions' });
+    }
+});
+
+// Update permissions (Admin only)
+app.put('/api/permissions', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    const { permissions } = req.body; // Array of { role, resource, action, allowed }
+
+    if (!Array.isArray(permissions)) {
+        return res.status(400).json({ error: 'Permissions must be an array' });
+    }
+
+    try {
+        // Update permissions in a transaction
+        await prisma.$transaction(
+            permissions.map(p =>
+                prisma.permission.upsert({
+                    where: {
+                        role_resource_action: {
+                            role: p.role,
+                            resource: p.resource,
+                            action: p.action
+                        }
+                    },
+                    update: { allowed: p.allowed },
+                    create: {
+                        role: p.role,
+                        resource: p.resource,
+                        action: p.action,
+                        allowed: p.allowed
+                    }
+                })
+            )
+        );
+
+        // Clear permission cache after update
+        clearPermissionCache();
+
+        res.json({ message: 'Permissions updated successfully' });
+    } catch (error) {
+        console.error('Error updating permissions:', error);
+        res.status(500).json({ error: 'Failed to update permissions' });
+    }
+});
+
+// ===== ORDERS API =====
+
+// Admin/Staff: Get All Orders with Pagination
+app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const sortBy = (req.query.sortBy as string) || 'date';
@@ -91,10 +173,26 @@ app.get('/api/orders', authenticateToken, requireAdmin, async (req: Request, res
     }
 });
 
-// Admin: Update Order Status
-app.put('/api/orders/:id/status', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+// Update Order Status (Restricted by Role)
+app.put('/api/orders/:id/status', authenticateToken, checkPermission('orders', 'update'), async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status, estimatedTime } = req.body; // estimatedTime in minutes
+    const userRole = (req as AuthRequest).user?.role;
+
+    // Role-based status validation
+    if (userRole === Role.KITCHEN_STAFF) {
+        if (!['preparing', 'ready'].includes(status)) {
+            return res.status(403).json({ error: 'Kitchen staff can only set status to preparing or ready' });
+        }
+    } else if (userRole === Role.DELIVERY_STAFF) {
+        if (!['out_for_delivery', 'delivered'].includes(status)) {
+            return res.status(403).json({ error: 'Delivery staff can only set status to out_for_delivery or delivered' });
+        }
+    } else if (userRole === Role.CUSTOMER_SUPPORT) {
+        if (status !== 'cancelled') {
+            return res.status(403).json({ error: 'Customer support can only cancel orders' });
+        }
+    }
 
     if (typeof id !== 'string') {
         return res.status(400).json({ error: 'Invalid order ID' });
@@ -103,15 +201,38 @@ app.put('/api/orders/:id/status', authenticateToken, requireAdmin, async (req: R
     try {
         const updateData: any = { status };
         
+        // Check ownership before update
+        const existingOrder = await prisma.order.findUnique({ where: { id: parseInt(id) } });
+        if (!existingOrder) return res.status(404).json({ error: 'Order not found' });
+
+        if (userRole === Role.KITCHEN_STAFF && existingOrder.kitchenStaffId && existingOrder.kitchenStaffId !== (req as AuthRequest).user?.userId) {
+             return res.status(403).json({ error: 'This order is being handled by another staff member' });
+        }
+        if (userRole === Role.DELIVERY_STAFF && existingOrder.deliveryStaffId && existingOrder.deliveryStaffId !== (req as AuthRequest).user?.userId) {
+             return res.status(403).json({ error: 'This order is being handled by another staff member' });
+        }
+
         if (status === 'preparing' && estimatedTime) {
             const readyAt = new Date();
             readyAt.setMinutes(readyAt.getMinutes() + parseInt(estimatedTime));
             updateData.estimatedReadyAt = readyAt;
         }
 
+        // Auto-assign staff
+        const userId = (req as AuthRequest).user?.userId;
+        if (status === 'preparing') {
+            updateData.kitchenStaffId = userId;
+        } else if (status === 'out_for_delivery') {
+            updateData.deliveryStaffId = userId;
+        }
+
         const order = await prisma.order.update({
             where: { id: parseInt(id) },
-            data: updateData
+            data: updateData,
+            include: { // Include for email service usage if needed, though usually just flat fields
+                 kitchenStaff: true,
+                 deliveryStaff: true
+            }
         });
 
         // Trigger email notification for status update
@@ -132,6 +253,77 @@ app.put('/api/orders/:id/status', authenticateToken, requireAdmin, async (req: R
 });
 
 
+// Kitchen Staff: Get Active Orders
+app.get('/api/orders/kitchen', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                OR: [
+                    { status: 'pending' },
+                    { 
+                        status: 'preparing',
+                        kitchenStaffId: (req as AuthRequest).user?.userId 
+                    }
+                ]
+            },
+            orderBy: { date: 'asc' },
+                include: {
+                    user: {
+                        select: { name: true, phoneNo: true }
+                    },
+                    kitchenStaff: {
+                        select: { name: true }
+                    }
+                }
+        });
+        
+        const sanitizedOrders = orders.map(order => ({
+            ...order,
+            total: Number(order.total)
+        }));
+
+        res.json(sanitizedOrders);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch kitchen orders' });
+    }
+});
+
+// Delivery Staff: Get Active Orders
+app.get('/api/orders/delivery', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                OR: [
+                    { status: 'ready' },
+                    { 
+                        status: 'out_for_delivery',
+                        deliveryStaffId: (req as AuthRequest).user?.userId
+                    }
+                ]
+            },
+            orderBy: { date: 'asc' },
+                include: {
+                    user: {
+                        select: { name: true, phoneNo: true, address: true }
+                    },
+                    deliveryStaff: {
+                        select: { name: true }
+                    }
+                }
+        });
+        
+        const sanitizedOrders = orders.map(order => ({
+            ...order,
+            total: Number(order.total)
+        }));
+
+        res.json(sanitizedOrders);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch delivery orders' });
+    }
+});
 
 // Seed Menu if empty (Simple check)
 const seedMenu = async () => {
@@ -238,7 +430,7 @@ app.get('/api/menu', async (req: Request, res: Response) => {
 });
 
 // Admin: Create Menu Item
-app.post('/api/menu', authenticateToken, requireAdmin, upload.single('image'), async (req: Request, res: Response) => {
+app.post('/api/menu', authenticateToken, checkPermission('menu', 'create'), upload.single('image'), async (req: Request, res: Response) => {
     const { name, description, price, category, imageUrl } = req.body;
     let imagePath = imageUrl;
 
@@ -270,7 +462,7 @@ app.post('/api/menu', authenticateToken, requireAdmin, upload.single('image'), a
 // ... (Menu Create Endpoint)
 
 // Admin: Create Category
-app.post('/api/categories', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.post('/api/categories', authenticateToken, checkPermission('categories', 'create'), async (req: Request, res: Response) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
 
@@ -318,7 +510,7 @@ app.get('/api/categories', async (req: Request, res: Response) => {
 });
 
 // Admin: Create User
-app.post('/api/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.post('/api/users', authenticateToken, checkPermission('users', 'create'), async (req: Request, res: Response) => {
     const { name, email, password, role } = req.body;
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
@@ -351,7 +543,7 @@ app.post('/api/users', authenticateToken, requireAdmin, async (req: Request, res
 });
 
 // Admin: Get All Users with Pagination
-app.get('/api/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.get('/api/users', authenticateToken, checkPermission('users', 'view'), async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = req.query.search as string;
@@ -401,7 +593,7 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: Request, res:
 });
 
 // Admin: Update User
-app.put('/api/users/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.put('/api/users/:id', authenticateToken, checkPermission('users', 'update'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { role, name, phoneNo, address } = req.body;
     try {
@@ -421,7 +613,7 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req: Request, 
 });
 
 // Admin: Delete User
-app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.delete('/api/users/:id', authenticateToken, checkPermission('users', 'delete'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await prisma.user.delete({ where: { id: parseInt(id) } });
@@ -432,7 +624,7 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req: Reques
 });
 
 // Admin: Update Menu Item
-app.put('/api/menu/:id', authenticateToken, requireAdmin, upload.single('image'), async (req: Request, res: Response) => {
+app.put('/api/menu/:id', authenticateToken, checkPermission('menu', 'update'), upload.single('image'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { name, description, price, category, imageUrl } = req.body;
     let image = imageUrl as string;
@@ -459,7 +651,7 @@ app.put('/api/menu/:id', authenticateToken, requireAdmin, upload.single('image')
 });
 
 // Admin: Delete Menu Item
-app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.delete('/api/menu/:id', authenticateToken, checkPermission('menu', 'delete'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await prisma.menuItem.delete({ where: { id: parseInt(id) } });
@@ -470,7 +662,7 @@ app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req: Request
 });
 
 // Admin: Update Category
-app.put('/api/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.put('/api/categories/:id', authenticateToken, checkPermission('categories', 'update'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const { name } = req.body;
     try {
@@ -485,7 +677,7 @@ app.put('/api/categories/:id', authenticateToken, requireAdmin, async (req: Requ
 });
 
 // Admin: Delete Category
-app.delete('/api/categories/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.delete('/api/categories/:id', authenticateToken, checkPermission('categories', 'delete'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await prisma.category.delete({ where: { id: parseInt(id) } });

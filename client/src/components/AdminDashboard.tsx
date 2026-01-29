@@ -14,9 +14,11 @@ import {
     fetchUsers,
     updateUser,
     deleteUser,
-    createUser
+    createUser,
+    fetchPermissions,
+    updatePermissions
 } from '../services/api';
-import type { Order, MenuItem, Category, User } from '../services/api';
+import type { Order, MenuItem, Category, User, Permission } from '../services/api';
 import { getCurrentUser } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -38,9 +40,10 @@ const AdminDashboard = () => {
     const [categoriesPage, setCategoriesPage] = useState({ total: 0, current: 1, totalPages: 1 });
 
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'categories' | 'users'>('orders');
+    const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'categories' | 'users' | 'permissions'>('orders');
     const [msg, setMsg] = useState({ type: '', text: '' });
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [permissions, setPermissions] = useState<Permission[]>([]);
 
     // Search & Sort States
     const [searchTerm, setSearchTerm] = useState('');
@@ -111,11 +114,12 @@ const AdminDashboard = () => {
     const loadAllData = async () => {
         setLoading(true);
         try {
-            const [ordersRes, menuRes, categoriesRes, usersRes] = await Promise.all([
+            const [ordersRes, menuRes, categoriesRes, usersRes, permissionsRes] = await Promise.all([
                 fetchOrders(1, 10, debouncedSearch, 'date', 'desc'),
                 fetchMenu(1, 10, 'All', debouncedSearch, 'id', 'asc'),
                 fetchCategories(1, 100, debouncedSearch, 'name', 'asc'),
-                fetchUsers(1, 10, debouncedSearch, 'id', 'asc')
+                fetchUsers(1, 10, debouncedSearch, 'id', 'asc'),
+                fetchPermissions()
             ]);
             
             setOrders(ordersRes.data);
@@ -129,6 +133,8 @@ const AdminDashboard = () => {
             
             setUsers(usersRes.data);
             setUsersPage({ total: usersRes.total, current: usersRes.page, totalPages: usersRes.totalPages });
+
+            setPermissions(permissionsRes);
         } catch (error) {
             console.error(error);
             showMsg('error', 'Failed to load data');
@@ -155,6 +161,9 @@ const AdminDashboard = () => {
                 const res = await fetchCategories(page, 100, debouncedSearch, sortBy, sortOrder);
                 setCategories(res.data);
                 setCategoriesPage({ total: res.total, current: res.page, totalPages: res.totalPages });
+            } else if (tab === 'permissions') {
+                const res = await fetchPermissions();
+                setPermissions(res);
             }
         } catch (error) {
             console.error(error);
@@ -383,6 +392,32 @@ const AdminDashboard = () => {
         }
     };
 
+    const handlePermissionToggle = async (role: string, resource: string, action: string, allowed: boolean) => {
+        // Optimistic update
+        const updatedPermissions = permissions.map(p => 
+            p.role === role && p.resource === resource && p.action === action
+                ? { ...p, allowed }
+                : p
+        );
+        
+        // If permission doesn't exist in array, add it
+        if (!updatedPermissions.find(p => p.role === role && p.resource === resource && p.action === action)) {
+            updatedPermissions.push({ id: 0, role, resource, action, allowed });
+        }
+        
+        setPermissions(updatedPermissions);
+
+        try {
+            await updatePermissions([{ role, resource, action, allowed }]);
+            showMsg('success', 'Permission updated');
+        } catch (error) {
+            console.error(error);
+            showMsg('error', 'Failed to update permission');
+            // Revert on error
+            loadTabData('permissions', 1);
+        }
+    };
+
     // --- Helper Logic for Sorting & Filtering ---
 
     const getSortedItems = (items: any[]) => {
@@ -429,6 +464,8 @@ const AdminDashboard = () => {
                                 <th onClick={() => handleSort('customer')} className="sortable">Customer {sortBy === 'customer' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
                                 <th onClick={() => handleSort('total')} className="sortable">Total {sortBy === 'total' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
                                 <th onClick={() => handleSort('status')} className="sortable">Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
+                                <th>Kitchen Staff</th>
+                                <th>Delivery Staff</th>
                                 <th>Details</th>
                                 <th>Action</th>
                             </tr>
@@ -450,6 +487,8 @@ const AdminDashboard = () => {
                                             {order.status}
                                         </span>
                                     </td>
+                                    <td>{order.kitchenStaff?.name || '-'}</td>
+                                    <td>{order.deliveryStaff?.name || '-'}</td>
                                     <td>
                                         <div className="actions-cell">
                                             <button className="btn-small" onClick={() => setSelectedOrder(order)}>View</button>
@@ -581,7 +620,69 @@ const AdminDashboard = () => {
                 </div>
             )}
 
-            {/* USERS TAB */}
+            {/* PERMISSIONS TAB */}
+            {activeTab === 'permissions' && (
+                <div className="admin-card">
+                    <h3>Role Permissions Management</h3>
+                    <p className="text-muted mb-4">Manage access control for different user roles.</p>
+                    
+                    <div className="orders-table-wrapper">
+                        <table className="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Role / Resource</th>
+                                    <th>Action</th>
+                                    <th>Access</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[
+                                    { role: 'KITCHEN_STAFF', label: 'Kitchen Staff' },
+                                    { role: 'DELIVERY_STAFF', label: 'Delivery Staff' },
+                                    { role: 'CUSTOMER_SUPPORT', label: 'Customer Support' }
+                                ].map(roleGroup => (
+                                    <>
+                                        <tr className="table-section-header" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                            <td colSpan={3} className="fw-bold text-accent py-3">{roleGroup.label}</td>
+                                        </tr>
+                                        {[
+                                            { resource: 'orders', action: 'view', label: 'View Orders' },
+                                            { resource: 'orders', action: 'update', label: 'Update Orders' },
+                                            { resource: 'orders', action: 'delete', label: 'Delete Orders' },
+                                            { resource: 'menu', action: 'view', label: 'View Menu' },
+                                            { resource: 'users', action: 'view', label: 'View Users' }
+                                        ].map((perm) => {
+                                            const permission = permissions.find(p => 
+                                                p.role === roleGroup.role && 
+                                                p.resource === perm.resource && 
+                                                p.action === perm.action
+                                            );
+                                            const isAllowed = permission?.allowed || false;
+                                            
+                                            return (
+                                                <tr key={`${roleGroup.role}-${perm.resource}-${perm.action}`}>
+                                                    <td style={{ paddingLeft: '2rem' }}>{perm.label} (Resource: {perm.resource})</td>
+                                                    <td>{perm.action}</td>
+                                                    <td>
+                                                        <label className="switch">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={isAllowed} 
+                                                                onChange={(e) => handlePermissionToggle(roleGroup.role, perm.resource, perm.action, e.target.checked)}
+                                                            />
+                                                            <span className="slider round"></span>
+                                                        </label>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
             {activeTab === 'users' && (
                 <div className="admin-grid-two-cols">
                     <div className="admin-card">
@@ -604,6 +705,9 @@ const AdminDashboard = () => {
                                 <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}>
                                     <option value="CUSTOMER">Customer</option>
                                     <option value="ADMIN">Admin</option>
+                                    <option value="KITCHEN_STAFF">Kitchen Staff</option>
+                                    <option value="DELIVERY_STAFF">Delivery Staff</option>
+                                    <option value="CUSTOMER_SUPPORT">Customer Support</option>
                                 </select>
                             </div>
                             <button type="submit" className="btn btn-primary">Create Account</button>

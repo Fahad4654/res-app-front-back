@@ -36,6 +36,14 @@ export interface Category {
   createdAt?: string;
 }
 
+export interface Permission {
+  id: number;
+  role: string;
+  resource: string;
+  action: string;
+  allowed: boolean;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -307,4 +315,31 @@ export const deleteCategory = async (id: number): Promise<void> => {
     }
   });
   if (!response.ok) throw new Error('Failed to delete category');
+};
+
+export const fetchPermissions = async (role?: string): Promise<Permission[]> => {
+  const token = getToken();
+  let url = `${API_URL}/permissions`;
+  if (role) url += `/${role}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!response.ok) throw new Error('Failed to fetch permissions');
+  return response.json();
+};
+
+export const updatePermissions = async (permissions: Partial<Permission>[]): Promise<void> => {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/permissions`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ permissions })
+  });
+  if (!response.ok) throw new Error('Failed to update permissions');
 };

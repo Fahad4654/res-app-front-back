@@ -28,12 +28,21 @@ model Order {
   estimatedReadyAt DateTime?
   userId           Int?
   user     User?    @relation(fields: [userId], references: [id])
+  
+  kitchenStaffId  Int?
+  kitchenStaff    User?    @relation("KitchenOrders", fields: [kitchenStaffId], references: [id])
+  
+  deliveryStaffId Int?
+  deliveryStaff   User?    @relation("DeliveryOrders", fields: [deliveryStaffId], references: [id])
   @@map("orders")
 }
 
 enum Role {
   CUSTOMER
   ADMIN
+  KITCHEN_STAFF
+  DELIVERY_STAFF
+  CUSTOMER_SUPPORT
 }
 
 model User {
@@ -46,7 +55,9 @@ model User {
   profilePicture String?
   role           Role     @default(CUSTOMER)
   createdAt      DateTime @default(now())
-  orders         Order[]
+  orders          Order[]
+  ordersPrepared  Order[]  @relation("KitchenOrders")
+  ordersDelivered Order[]  @relation("DeliveryOrders")
   @@map("users")
 }
 
@@ -55,4 +66,17 @@ model Category {
   name      String   @unique
   createdAt DateTime @default(now())
   @@map("categories")
+}
+
+model Permission {
+  id        Int      @id @default(autoincrement())
+  role      Role
+  resource  String   // e.g., "orders", "menu", "users", "categories"
+  action    String   // e.g., "view", "create", "update", "delete"
+  allowed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, resource, action])
+  @@map("permissions")
 }

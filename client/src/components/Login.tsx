@@ -15,6 +15,12 @@ const Login = () => {
       saveAuth(data);
       if (data.user.role === 'ADMIN') {
         window.location.href = '/admin';
+      } else if (data.user.role === 'KITCHEN_STAFF') {
+        window.location.href = '/kitchen';
+      } else if (data.user.role === 'DELIVERY_STAFF') {
+        window.location.href = '/delivery';
+      } else if (data.user.role === 'CUSTOMER_SUPPORT') {
+        window.location.href = '/support';
       } else {
         window.location.href = '/';
       }

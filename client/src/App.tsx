@@ -10,9 +10,13 @@ import Cart from './components/Cart';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminDashboard from './components/AdminDashboard';
+import KitchenDashboard from './components/KitchenDashboard';
+import DeliveryDashboard from './components/DeliveryDashboard';
+import SupportDashboard from './components/SupportDashboard';
 import MyOrders from './components/MyOrders';
 import Profile from './components/Profile';
 import About from './components/About';
+import ProtectedRoute from './components/ProtectedRoute';
 import './styles/global.css';
 
 const Home = () => (
@@ -88,7 +92,44 @@ function AppContent() {
         <Route path="/about" element={<About />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/register" element={<Register />} />
+        
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/kitchen" 
+          element={
+            <ProtectedRoute allowedRoles={['KITCHEN_STAFF', 'ADMIN']}>
+              <KitchenDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/delivery" 
+          element={
+            <ProtectedRoute allowedRoles={['DELIVERY_STAFF', 'ADMIN']}>
+              <DeliveryDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/support" 
+          element={
+            <ProtectedRoute allowedRoles={['CUSTOMER_SUPPORT', 'ADMIN']}>
+              <SupportDashboard />
+            </ProtectedRoute>
+          } 
+        />
+
         <Route path="/my-orders" element={<MyOrders />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>

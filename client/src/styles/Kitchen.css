@@ -1,0 +1,164 @@
+/* Kitchen Dashboard Styles */
+
+.kitchen-container {
+    padding: 2rem;
+    background-color: #1a1a1a;
+    min-height: 100vh;
+    color: #e0e0e0;
+}
+
+.kitchen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid #333;
+    padding-bottom: 1rem;
+}
+
+.kitchen-header h1 {
+    font-size: 2rem;
+    margin: 0;
+    color: #ffd700;
+}
+
+.kitchen-stats {
+    display: flex;
+    gap: 1rem;
+}
+
+.stat-pill {
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.stat-pill.pending { background-color: #e74c3c; color: white; }
+.stat-pill.preparing { background-color: #f39c12; color: white; }
+
+/* Board Layout */
+.kitchen-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.kitchen-column {
+    background: #2a2a2a;
+    border-radius: 12px;
+    padding: 1.5rem;
+    min-height: 70vh;
+}
+
+.kitchen-column h2 {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.5rem;
+    border-bottom: 1px solid #444;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.badge {
+    background: #444;
+    padding: 0.2rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+}
+
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 0;
+    color: #666;
+    font-style: italic;
+}
+
+/* Order Card */
+.kitchen-card {
+    background: #333;
+    border-radius: 8px;
+    padding: 1.25rem;
+    border-left: 5px solid #666;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.kitchen-card.preparing-card {
+    border-left-color: #f39c12;
+    background: #3a3225;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.order-id { color: #ffd700; }
+.order-time { color: #aaa; font-size: 0.9rem; font-weight: normal; }
+
+.card-items {
+    margin-bottom: 1.5rem;
+}
+
+.order-item {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.order-item:last-child {
+    border-bottom: none;
+}
+
+.order-item .qty {
+    color: #e74c3c;
+    font-weight: bold;
+    font-family: monospace;
+    font-size: 1.1rem;
+}
+
+.timer-display {
+    background: rgba(243, 156, 18, 0.2);
+    color: #f39c12;
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: bold;
+}
+
+.btn-kitchen-action {
+    width: 100%;
+    padding: 1rem;
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-kitchen-action:hover {
+    background: #219150;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .kitchen-board {
+        grid-template-columns: 1fr;
+    }
+}
