@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { fetchMenu, fetchCategories } from '../services/api';
 import type { MenuItem, Category } from '../services/api';
+import { FaStar, FaStarHalfAlt, FaRegStar, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import '../styles/Menu.css';
 
 interface MenuProps {
@@ -13,8 +14,10 @@ const Menu = ({ onAddToCart }: MenuProps) => {
   const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [expandedItem, setExpandedItem] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [limit, setLimit] = useState(10);
   
   // Search & Sort State
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +28,7 @@ const Menu = ({ onAddToCart }: MenuProps) => {
     const loadData = async () => {
       try {
         const [menuRes, categoryRes] = await Promise.all([
-          fetchMenu(currentPage, 6, activeCategory, searchTerm, sortBy, sortOrder),
+          fetchMenu(currentPage, limit, activeCategory, searchTerm, sortBy, sortOrder),
           fetchCategories()
         ]);
         setItems(menuRes.data);
@@ -38,12 +41,12 @@ const Menu = ({ onAddToCart }: MenuProps) => {
       }
     };
     loadData();
-  }, [currentPage, activeCategory, searchTerm, sortBy, sortOrder]);
+  }, [currentPage, limit, activeCategory, searchTerm, sortBy, sortOrder]);
 
   // Reset to page 1 when filters or sorting change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeCategory, searchTerm, sortBy, sortOrder]);
+  }, [activeCategory, searchTerm, sortBy, sortOrder, limit]);
 
   const getFilteredAndSortedItems = () => {
     // Sorting is now handled server-side. 
@@ -79,6 +82,20 @@ const Menu = ({ onAddToCart }: MenuProps) => {
               onChange={e => setSearchTerm(e.target.value)}
               className="menu-search-input"
             />
+            <div className="select-group">
+              <span className="small text-muted" style={{ fontSize: '0.7rem' }}>Show:</span>
+              <select 
+                className="menu-sort-select"
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                style={{ minWidth: '70px' }}
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
             <select 
               className="menu-sort-select"
               value={`${sortBy}-${sortOrder}`}
@@ -104,7 +121,13 @@ const Menu = ({ onAddToCart }: MenuProps) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               key={item.id} 
-              className="menu-card"
+              className={`menu-card ${expandedItem === item.id ? 'expanded' : ''}`}
+              onClick={() => {
+                if (item.latestReviews && item.latestReviews.length > 0) {
+                  setExpandedItem(expandedItem === item.id ? null : item.id!);
+                }
+              }}
+              style={{ cursor: (item.latestReviews?.length ?? 0) > 0 ? 'pointer' : 'default' }}
             >
               <div className="card-image" style={{ backgroundImage: `url(${item.image})` }}></div>
               <div className="card-content">
@@ -112,8 +135,59 @@ const Menu = ({ onAddToCart }: MenuProps) => {
                   <h3>{item.name}</h3>
                   <span className="price">${item.price.toFixed(2)}</span>
                 </div>
-                <p className="description">{item.description}</p>
-                <button className="btn btn-primary add-btn" onClick={() => onAddToCart(item)}>
+                
+                {item.avgRating !== undefined && item.reviewCount! > 0 && (
+                  <div className="rating-display">
+                    <div className="stars">
+                      {[...Array(5)].map((_, i) => {
+                        const rating = item.avgRating || 0;
+                        if (i < Math.floor(rating)) return <FaStar key={i} />;
+                        if (i < rating) return <FaStarHalfAlt key={i} />;
+                        return <FaRegStar key={i} />;
+                      })}
+                    </div>
+                    <span className="rating-count">({item.reviewCount})</span>
+                  </div>
+                )}
+
+                <p className="description">
+                  {item.description}
+                </p>
+
+                {item.latestReviews && item.latestReviews.length > 0 && (
+                  <div className="item-reviews-peek">
+                    <div className="reviews-toggle">
+                      {expandedItem === item.id ? <><FaChevronUp /> Hide Reviews</> : <><FaChevronDown /> View Reviews</>}
+                    </div>
+                    
+                    {expandedItem === item.id && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="reviews-list"
+                      >
+                        {item.latestReviews.map((rev: any, idx: number) => (
+                          <div key={idx} className="review-item">
+                            <div className="review-header">
+                              <span className="review-user">{rev.user?.name || 'Customer'}</span>
+                              <div className="review-stars">
+                                {[...Array(5)].map((_, i) => (
+                                  <FaStar key={i} style={{ fontSize: '0.65rem', color: i < rev.rating ? '#ffc107' : '#444' }} />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="review-comment">"{rev.comment}"</p>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                <button 
+                  className="btn btn-primary add-btn" 
+                  onClick={(e) => { e.stopPropagation(); onAddToCart(item); }}
+                >
                   Add to Cart
                 </button>
               </div>
@@ -122,7 +196,7 @@ const Menu = ({ onAddToCart }: MenuProps) => {
         </div>
 
         {totalPages > 1 && (
-          <div className="pagination" style={{ marginTop: '3rem' }}>
+          <div className="pagination">
             <button 
               disabled={currentPage === 1} 
               onClick={() => setCurrentPage(currentPage - 1)}

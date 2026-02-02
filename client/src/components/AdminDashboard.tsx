@@ -16,13 +16,14 @@ import {
     deleteUser,
     createUser,
     fetchPermissions,
-    updatePermissions
+    updatePermissions,
+    acceptReview
 } from '../services/api';
 import type { Order, MenuItem, Category, User, Permission } from '../services/api';
 import { getCurrentUser } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaStar, FaCheckCircle } from 'react-icons/fa';
 import ConfirmModal from './ConfirmModal';
 import InputModal from './InputModal';
 import '../styles/Admin.css';
@@ -82,7 +83,8 @@ const AdminDashboard = () => {
         defaultValue: '',
         onSubmit: () => {} 
     });
-
+    const [selectedTagItems, setSelectedTagItems] = useState<number[]>([]);
+    const [isAcceptingReview, setIsAcceptingReview] = useState(false);
     const navigate = useNavigate();
 
     // Debounced search term
@@ -110,6 +112,10 @@ const AdminDashboard = () => {
             loadTabData(activeTab, 1);
         }
     }, [debouncedSearch, activeTab, sortBy, sortOrder]);
+
+    useEffect(() => {
+        setSelectedTagItems([]);
+    }, [selectedOrder]);
 
     const loadAllData = async () => {
         setLoading(true);
@@ -143,7 +149,7 @@ const AdminDashboard = () => {
         }
     };
 
-    const loadTabData = async (tab: typeof activeTab, page: number) => {
+    const loadTabData = async (tab: string = activeTab, page: number = 1) => {
         try {
             if (tab === 'orders') {
                 const res = await fetchOrders(page, 10, debouncedSearch, sortBy, sortOrder);
@@ -214,12 +220,15 @@ const AdminDashboard = () => {
     };
 
     const groupItems = (items: any[]) => {
+        if (!items || !Array.isArray(items)) return [];
         return items.reduce((acc: any[], item: any) => {
-            const existing = acc.find(i => i.id === item.id);
+            const itemId = Number(item.id);
+            if (isNaN(itemId)) return acc;
+            const existing = acc.find(i => Number(i.id) === itemId);
             if (existing) {
                 existing.quantity = (existing.quantity || 1) + (item.quantity || 1);
             } else {
-                acc.push({ ...item, quantity: item.quantity || 1 });
+                acc.push({ ...item, id: itemId, quantity: item.quantity || 1 });
             }
             return acc;
         }, []);
@@ -278,6 +287,29 @@ const AdminDashboard = () => {
                 }
             }
         });
+    };
+
+    const handleAcceptReview = async (reviewId: number) => {
+        if (!reviewId) {
+            showMsg('error', 'Review ID is missing');
+            return;
+        }
+        setIsAcceptingReview(true);
+        try {
+            await acceptReview(reviewId, selectedTagItems);
+            showMsg('success', 'Review accepted and tagged');
+            loadTabData('orders', ordersPage.current);
+            if (selectedOrder) {
+                setSelectedOrder({
+                    ...selectedOrder,
+                    review: { ...selectedOrder.review!, isAccepted: true, menuItemIds: selectedTagItems }
+                });
+            }
+        } catch (error: any) {
+            showMsg('error', error.message || 'Failed to accept review');
+        } finally {
+            setIsAcceptingReview(false);
+        }
     };
 
     const handleDeleteOrder = async (id: number) => {
@@ -451,6 +483,7 @@ const AdminDashboard = () => {
                 <button className={activeTab === 'menu' ? 'active' : ''} onClick={() => {setActiveTab('menu'); setEditingItem(null); setSortBy('name'); setSortOrder('asc'); setSearchTerm('')}}>Menu</button>
                 <button className={activeTab === 'categories' ? 'active' : ''} onClick={() => {setActiveTab('categories'); setEditingItem(null); setSearchTerm('')}}>Categories</button>
                 <button className={activeTab === 'users' ? 'active' : ''} onClick={() => {setActiveTab('users'); setEditingItem(null); setSortBy('name'); setSortOrder('asc'); setSearchTerm('')}}>Users</button>
+                <button className={activeTab === 'permissions' ? 'active' : ''} onClick={() => {setActiveTab('permissions'); setEditingItem(null); setSearchTerm('')}}>Permissions</button>
             </div>
 
             {/* ORDERS TAB */}
@@ -483,9 +516,14 @@ const AdminDashboard = () => {
                                     </td>
                                     <td className="text-accent fw-bold">${Number(order.total).toFixed(2)}</td>
                                     <td>
-                                        <span className={`status-badge status-${(order.status || 'pending').toLowerCase()}`}>
-                                            {order.status}
-                                        </span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <span className={`status-badge status-${(order.status || 'pending').toLowerCase()}`}>
+                                                {order.status}
+                                            </span>
+                                            {order.isDeletedByCustomer && (
+                                                <span className="status-badge" style={{ background: '#333', color: '#888', fontSize: '0.7rem' }}>CUSTOMER DELETED</span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td>{order.kitchenStaff?.name || '-'}</td>
                                     <td>{order.deliveryStaff?.name || '-'}</td>
@@ -841,6 +879,90 @@ const AdminDashboard = () => {
                                     </div>
                                 ))}
                             </div>
+
+                            {selectedOrder.review && (
+                                <div className="detail-section">
+                                    <h4>Customer Review</h4>
+                                    <div className="customer-card">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <div style={{ color: '#ffc107' }}>
+                                                {[...Array(5)].map((_, i) => (
+                                                    <FaStar key={i} style={{ color: i < selectedOrder.review!.rating ? '#ffc107' : '#444' }} />
+                                                ))}
+                                            </div>
+                                            {selectedOrder.review.isAccepted && (
+                                                <span style={{ color: '#4caf50', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <FaCheckCircle /> ACCEPTED & TAGGED
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                                            <p className="small mb-2 fw-bold">
+                                                {selectedOrder.review.isAccepted ? 'Manage Tags:' : 'Tag this review to items:'}
+                                            </p>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                                                {groupItems(selectedOrder.items).map((item: any) => {
+                                                    const idNum = Number(item.id);
+                                                    const isSelected = selectedTagItems.includes(idNum);
+                                                    return (
+                                                        <div 
+                                                            key={idNum} 
+                                                            className="tag-chip" 
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setSelectedTagItems(selectedTagItems.filter(id => id !== idNum));
+                                                                } else {
+                                                                    setSelectedTagItems([...selectedTagItems, idNum]);
+                                                                }
+                                                            }}
+                                                            style={{ 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '8px', 
+                                                                padding: '8px 16px', 
+                                                                background: isSelected ? 'var(--color-accent)' : 'rgba(255,255,255,0.05)',
+                                                                border: `1px solid ${isSelected ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)'}`,
+                                                                borderRadius: '50px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.85rem',
+                                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                color: isSelected ? '#000' : '#fff',
+                                                                fontWeight: isSelected ? '600' : '400'
+                                                            }}
+                                                        >
+                                                            {isSelected && <FaCheckCircle style={{ fontSize: '0.8rem' }} />}
+                                                            {item.name}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <button 
+                                                className={`btn btn-primary ${isAcceptingReview ? 'disabled' : ''}`}
+                                                onClick={() => {
+                                                    if (selectedOrder.review?.id) {
+                                                        handleAcceptReview(selectedOrder.review.id);
+                                                    } else {
+                                                        showMsg('error', 'Review ID is missing from order data');
+                                                    }
+                                                }}
+                                                disabled={isAcceptingReview}
+                                                style={{ 
+                                                    width: '100%', 
+                                                    opacity: isAcceptingReview ? 0.5 : 1,
+                                                    cursor: isAcceptingReview ? 'not-allowed' : 'pointer',
+                                                    filter: isAcceptingReview ? 'grayscale(0.5)' : 'none'
+                                                }}
+                                            >
+                                                {isAcceptingReview ? 'Processing...' : (selectedOrder.review.isAccepted ? 'Update Tags' : 'Accept & Tag to Menu')}
+                                            </button>
+                                        </div>
+
+                                        <p className="small text-muted" style={{ marginTop: '16px' }}>
+                                            Review Date: {new Date(selectedOrder.review.createdAt || '').toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="modal-footer">
                             <span className="total-label">Total Amount</span>

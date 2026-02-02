@@ -15,6 +15,7 @@ model MenuItem {
   category    String?
   image       String?
   createdAt   DateTime @default(now())
+  reviews     Review[] @relation("MenuItemReviews")
   @@map("menu_items")
 }
 
@@ -34,6 +35,9 @@ model Order {
   
   deliveryStaffId Int?
   deliveryStaff   User?    @relation("DeliveryOrders", fields: [deliveryStaffId], references: [id])
+  
+  isDeletedByCustomer Boolean @default(false)
+  review              Review?
   @@map("orders")
 }
 
@@ -58,6 +62,7 @@ model User {
   orders          Order[]
   ordersPrepared  Order[]  @relation("KitchenOrders")
   ordersDelivered Order[]  @relation("DeliveryOrders")
+  reviews         Review[]
   @@map("users")
 }
 
@@ -79,4 +84,22 @@ model Permission {
 
   @@unique([role, resource, action])
   @@map("permissions")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+  
+  orderId   Int      @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+
+  isAccepted Boolean @default(false)
+  taggedItems MenuItem[] @relation("MenuItemReviews")
+
+  @@map("reviews")
 }

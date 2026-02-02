@@ -7,6 +7,9 @@ export interface MenuItem {
   image: string;
   quantity?: number;
   createdAt?: string;
+  avgRating?: number;
+  reviewCount?: number;
+  latestReviews?: Review[];
 }
 
 import type { User } from './auth';
@@ -30,6 +33,19 @@ export interface Order {
   user?: User;
   kitchenStaff?: { name: string };
   deliveryStaff?: { name: string; phoneNo?: string };
+  isDeletedByCustomer?: boolean;
+  review?: Review;
+}
+
+export interface Review {
+  id?: number;
+  rating: number;
+  comment?: string;
+  createdAt?: string;
+  isAccepted?: boolean;
+  menuItemIds?: number[];
+  taggedItems?: MenuItem[];
+  user?: { name: string };
 }
 
 export interface Category {
@@ -344,4 +360,35 @@ export const updatePermissions = async (permissions: Partial<Permission>[]): Pro
     body: JSON.stringify({ permissions })
   });
   if (!response.ok) throw new Error('Failed to update permissions');
+};
+
+// Reviews
+export const createReview = async (reviewData: { orderId: number; rating: number; comment?: string }) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/reviews`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reviewData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to submit review');
+    return data;
+};
+
+export const acceptReview = async (id: number, menuItemIds: number[]) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/reviews/${id}/accept`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ menuItemIds })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to accept review');
+    return data;
 };

@@ -155,7 +155,12 @@ app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), asy
                     user: { select: { name: true, phoneNo: true } },
                     // customer is a JSON field, so it is returned by default
                     kitchenStaff: { select: { name: true } },
-                    deliveryStaff: { select: { name: true } }
+                    deliveryStaff: { select: { name: true } },
+                    review: {
+                        include: {
+                            taggedItems: { select: { id: true } }
+                        }
+                    }
                 }
             }),
             prisma.order.count({ where })
@@ -413,15 +418,31 @@ app.get('/api/menu', async (req: Request, res: Response) => {
             where,
             orderBy: { [sortBy]: sortOrder },
             skip,
-            take: limit
+            take: limit,
+            include: {
+                reviews: {
+                    where: { isAccepted: true },
+                    select: { rating: true, comment: true, createdAt: true, user: { select: { name: true } } },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
         }),
         prisma.menuItem.count({ where })
     ]);
     
-    const sanitizedItems = items.map(item => ({
-        ...item,
-        price: Number(item.price)
-    }));
+    const sanitizedItems = items.map(item => {
+        const reviews = (item as any).reviews || [];
+        const avgRating = reviews.length > 0 
+            ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length 
+            : 0;
+        return {
+            ...item,
+            price: Number(item.price),
+            avgRating: parseFloat(avgRating.toFixed(1)),
+            reviewCount: reviews.length,
+            latestReviews: reviews.slice(0, 3)
+        };
+    });
 
     res.json({
         data: sanitizedItems,
@@ -763,16 +784,17 @@ app.get('/api/orders/my-orders', authenticateToken, async (req: Request, res: Re
     try {
         const [orders, total] = await Promise.all([
             prisma.order.findMany({
-                where: { userId },
+                where: { userId, isDeletedByCustomer: false },
                 orderBy: { [sortBy]: sortOrder },
                 skip,
                 take: limit,
                 include: {
                     kitchenStaff: { select: { name: true } },
-                    deliveryStaff: { select: { name: true, phoneNo: true } }
+                    deliveryStaff: { select: { name: true, phoneNo: true } },
+                    review: { select: { id: true, rating: true, comment: true } }
                 }
             }),
-            prisma.order.count({ where: { userId } })
+            prisma.order.count({ where: { userId, isDeletedByCustomer: false } })
         ]);
         
         const sanitizedOrders = orders.map(order => ({
@@ -891,11 +913,18 @@ app.delete('/api/orders/:id', authenticateToken, async (req: Request, res: Respo
             return res.status(400).json({ error: 'This order cannot be deleted in its current status' });
         }
 
-        await prisma.order.delete({
-            where: { id: parseInt(id as string) }
-        });
-
-        res.json({ message: 'Order deleted successfully' });
+        if (userRole === 'CUSTOMER') {
+            await prisma.order.update({
+                where: { id: parseInt(id as string) },
+                data: { isDeletedByCustomer: true }
+            });
+            res.json({ message: 'Order removed from your view' });
+        } else {
+            await prisma.order.delete({
+                where: { id: parseInt(id as string) }
+            });
+            res.json({ message: 'Order permanently deleted' });
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to delete order' });
@@ -938,6 +967,84 @@ setInterval(async () => {
     }
 }, 30000); // Check every 30 seconds
 
+// Reviews: Create Review
+app.post('/api/reviews', authenticateToken, async (req: Request, res: Response) => {
+    const userId = (req as AuthRequest).user?.userId;
+    const { orderId, rating, comment } = req.body;
+
+    if (!userId) return res.sendStatus(403);
+    if (!orderId || !rating) return res.status(400).json({ error: 'Order ID and rating are required' });
+
+    try {
+        const order = await prisma.order.findUnique({
+            where: { id: parseInt(orderId) }
+        });
+
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        if (order.userId !== userId) return res.status(403).json({ error: 'You can only review your own orders' });
+        if (order.status.toLowerCase() !== 'delivered') {
+            return res.status(400).json({ error: 'You can only review delivered orders' });
+        }
+
+        const review = await prisma.review.create({
+            data: {
+                rating: parseInt(rating),
+                comment,
+                orderId: parseInt(orderId),
+                userId
+            }
+        });
+
+        res.status(201).json({ message: 'Review submitted successfully', review });
+    } catch (error: any) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ error: 'You have already reviewed this order' });
+        }
+        console.error(error);
+        res.status(500).json({ error: 'Failed to submit review' });
+    }
+});
+
+// Admin: Get All Reviews
+app.get('/api/reviews', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    try {
+        const reviews = await prisma.review.findMany({
+            include: {
+                user: { select: { name: true, email: true } },
+                order: { select: { id: true, items: true, total: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(reviews);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+});
+
+// Admin: Accept & Tag Review
+app.patch('/api/reviews/:id/accept', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { menuItemIds } = req.body; // Array of MenuItem IDs to tag
+
+    try {
+        const review = await prisma.review.update({
+            where: { id: parseInt(id as string) },
+            data: {
+                isAccepted: true,
+                taggedItems: {
+                    set: (menuItemIds || []).map((itemId: number) => ({ id: itemId }))
+                }
+            }
+        });
+
+        res.json({ message: 'Review accepted and tagged successfully', review });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to accept review' });
+    }
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });

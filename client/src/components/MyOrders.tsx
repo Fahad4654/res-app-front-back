@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { fetchMyOrders, cancelOrder, deleteOrder } from '../services/api';
+import { fetchMyOrders, cancelOrder, deleteOrder, createReview } from '../services/api';
 import type { Order } from '../services/api';
 import { getCurrentUser } from '../services/auth';
-import { FaTrash } from 'react-icons/fa';
+import { FaTrash, FaStar, FaRegStar } from 'react-icons/fa';
 import CountdownTimer from './CountdownTimer';
 import ConfirmModal from './ConfirmModal';
 import '../styles/Admin.css'; // Reusing admin table styles for consistency
@@ -20,6 +20,11 @@ const MyOrders = () => {
         message: '', 
         onConfirm: () => {} 
     });
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewingOrderId, setReviewingOrderId] = useState<number | null>(null);
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState('');
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
     const loadOrders = async (page = 1) => {
         try {
@@ -89,17 +94,40 @@ const MyOrders = () => {
         setConfirmModal({
             isOpen: true,
             title: 'Delete Order',
-            message: 'Are you sure you want to delete this order? This action cannot be undone.',
+            message: 'Are you sure you want to remove this order from your view?',
             onConfirm: async () => {
                 try {
                     await deleteOrder(id);
                     loadOrders(ordersPage.current);
-                    toast.success('Order deleted successfully');
+                    toast.success('Order removed successfully');
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
                 } catch (error: any) {
                     toast.error(error.message || 'Failed to delete order');
                 }
             }
         });
+    };
+
+    const handleReviewSubmit = async () => {
+        if (!reviewingOrderId) return;
+        setIsSubmittingReview(true);
+        try {
+            await createReview({
+                orderId: reviewingOrderId,
+                rating,
+                comment
+            });
+            toast.success('Review submitted successfully!');
+            setIsReviewModalOpen(false);
+            setReviewingOrderId(null);
+            setRating(5);
+            setComment('');
+            loadOrders(ordersPage.current);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to submit review');
+        } finally {
+            setIsSubmittingReview(false);
+        }
     };
 
     const Pagination = ({ current, totalPages, onPageChange }: { current: number, totalPages: number, onPageChange: (p: number) => void }) => {
@@ -211,8 +239,14 @@ const MyOrders = () => {
                                                 {order.status === 'pending' && (
                                                     <button className="btn-small btn-danger" onClick={() => handleCancelOrder(order.id!)} style={{ color: '#ff4d4d' }}>Cancel</button>
                                                 )}
+                                                {order.status === 'delivered' && !order.review && (
+                                                    <button className="btn-small btn-primary" onClick={() => { setReviewingOrderId(order.id!); setIsReviewModalOpen(true); }} style={{ background: 'var(--color-accent)', color: '#000' }}>Rate Order</button>
+                                                )}
+                                                {order.status === 'delivered' && order.review && (
+                                                    <span style={{ fontSize: '0.8rem', color: '#ffc107', display: 'flex', alignItems: 'center', gap: '2px' }}><FaStar /> {order.review.rating}</span>
+                                                )}
                                                 {['pending', 'cancelled', 'delivered'].includes((order.status || '').toLowerCase()) && (
-                                                    <button className="icon-btn delete" onClick={() => handleDeleteOrder(order.id!)} style={{ width: '30px', height: '30px', borderRadius: '6px' }} title="Delete Order">
+                                                    <button className="icon-btn delete" onClick={() => handleDeleteOrder(order.id!)} style={{ width: '30px', height: '30px', borderRadius: '6px' }} title="Remove Order">
                                                         <FaTrash style={{ width: '14px', height: '14px' }} />
                                                     </button>
                                                 )}
@@ -264,6 +298,51 @@ const MyOrders = () => {
                         <div className="modal-footer">
                             <span className="total-label">Total Amount</span>
                             <span className="total-amount">${Number(selectedOrder.total).toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Review Modal */}
+            {isReviewModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsReviewModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                        <div className="modal-header">
+                            <h3>Rate Your Order</h3>
+                            <button className="close-modal" onClick={() => setIsReviewModalOpen(false)}>&times;</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="rating-selector" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2rem', fontSize: '2rem' }}>
+                                {[1, 2, 3, 4, 5].map(star => (
+                                    <span 
+                                        key={star} 
+                                        onClick={() => setRating(star)} 
+                                        style={{ cursor: 'pointer', color: star <= rating ? '#ffc107' : '#444' }}
+                                    >
+                                        {star <= rating ? <FaStar /> : <FaRegStar />}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="form-group">
+                                <label>Your Comment (Optional)</label>
+                                <textarea 
+                                    className="admin-form textarea" 
+                                    value={comment} 
+                                    onChange={e => setComment(e.target.value)}
+                                    placeholder="Share your experience..."
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px', borderRadius: '8px', minHeight: '100px' }}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={handleReviewSubmit} 
+                                disabled={isSubmittingReview}
+                                style={{ width: '100%', padding: '12px', background: 'var(--color-accent)', color: '#000', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}
+                            >
+                                {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+                            </button>
                         </div>
                     </div>
                 </div>
