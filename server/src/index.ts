@@ -14,6 +14,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { sendOrderConfirmation, sendAdminNotification, sendOrderStatusUpdate } from './services/emailService.js';
+import PDFDocument from 'pdfkit';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -181,6 +182,120 @@ app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), asy
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+// Admin: Generate Order Invoice (PDF)
+app.get('/api/orders/:id/invoice', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const order = await prisma.order.findUnique({
+            where: { id: parseInt(id as string) },
+            include: { user: true }
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const doc = new PDFDocument({ 
+            size: [396, 612], // Memo/Statement size (5.5 x 8.5 inches)
+            margin: 30 
+        });
+        const filename = `Invoice_${order.id}.pdf`;
+        
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        doc.pipe(res);
+
+        // Header - Center aligned
+        doc.fontSize(18).fillColor('#d4af37').text('CloudResto', { align: 'center' });
+        doc.fontSize(8).fillColor('#666666').text('Premium Culinary Experience', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.strokeColor('#333333').lineWidth(0.5).moveTo(30, doc.y).lineTo(366, doc.y).stroke();
+        doc.moveDown(0.8);
+
+        // Invoice/Order Info - Side by Side layout
+        const topY = doc.y;
+        doc.fontSize(9).fillColor('#d4af37').text('BILL TO:', 30, topY, { underline: true });
+        
+        const customer = order.customer as any;
+        doc.fontSize(9).fillColor('#1a1a1a').text(customer.name || 'Guest Customer', 30, doc.y + 2);
+        doc.fontSize(7).fillColor('#444444').text(customer.email || '', 30, doc.y);
+        if (customer.phoneNo) doc.text(`Phone: ${customer.phoneNo}`, 30, doc.y);
+        if (customer.address) doc.text(`Address: ${customer.address}`, 30, doc.y, { width: 180 });
+
+        doc.fontSize(11).fillColor('#1a1a1a').text('INVOICE', 250, topY, { align: 'right', width: 116 });
+        doc.fontSize(7).fillColor('#555555').text(`Order ID: #${order.id}`, 250, doc.y, { align: 'right', width: 116 });
+        doc.text(`Date: ${new Date(order.date).toLocaleDateString()}`, 250, doc.y, { align: 'right', width: 116 });
+        doc.text(`Status: ${order.status.toUpperCase()}`, 250, doc.y, { align: 'right', width: 116 });
+        doc.moveDown(1);
+
+        // Table Header
+        const tableTop = doc.y;
+        doc.fontSize(8).font('Helvetica-Bold').fillColor('#d4af37');
+        doc.text('Item', 30, tableTop);
+        doc.text('Qty', 210, tableTop, { width: 30, align: 'right' });
+        doc.text('Price', 250, tableTop, { width: 50, align: 'right' });
+        doc.text('Total', 310, tableTop, { width: 56, align: 'right' });
+        
+        doc.moveDown(0.2);
+        doc.strokeColor('#e0e0e0').lineWidth(0.5).moveTo(30, doc.y).lineTo(366, doc.y).stroke();
+        doc.font('Helvetica').fillColor('#1a1a1a');
+
+        // Items - Compact
+        let currentY = doc.y + 5;
+        const items = order.items as any[];
+        
+        // Even more aggressive scaling for STATEMENT page
+        const itemFontSize = items.length > 15 ? 7 : 8;
+        doc.fontSize(itemFontSize);
+
+        items.forEach((item: any) => {
+            if (currentY > 520) return; // Prevent items from pushing into the total/footer zone
+
+            const startY = currentY;
+            doc.text(item.name, 30, currentY, { width: 170 });
+            doc.text(item.quantity.toString(), 210, currentY, { width: 30, align: 'right' });
+            doc.text(`$${Number(item.price).toFixed(2)}`, 250, currentY, { width: 50, align: 'right' });
+            const itemTotal = (Number(item.price) * (item.quantity || 1)).toFixed(2);
+            doc.text(`$${itemTotal}`, 310, currentY, { width: 56, align: 'right' });
+            
+            currentY = Math.max(doc.y, startY + (itemFontSize + 1.5));
+        });
+
+        doc.moveDown(0.2);
+        doc.strokeColor('#e0e0e0').moveTo(30, currentY).lineTo(366, currentY).stroke();
+        currentY += 6;
+
+        // Totals
+        const deliveryCharge = parseFloat(req.query.deliveryCharge as string) || 0;
+        const grandTotal = Number(order.total) + deliveryCharge;
+
+        if (deliveryCharge > 0) {
+            doc.fontSize(8).font('Helvetica').fillColor('#555555');
+            doc.text('Delivery Charge:', 210, currentY, { width: 90, align: 'right' });
+            doc.text(`$${deliveryCharge.toFixed(2)}`, 310, currentY, { width: 56, align: 'right' });
+            currentY += 12;
+        }
+
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#d4af37');
+        doc.text('Total Amount:', 210, currentY, { width: 90, align: 'right' });
+        doc.text(`$${grandTotal.toFixed(2)}`, 310, currentY, { width: 56, align: 'right' });
+
+        // Footer - Scaled for STATEMENT page
+        doc.fontSize(7).font('Helvetica-Oblique').fillColor('#888888')
+           .text('CloudResto - Thank you for your business!', 30, 570, { align: 'center', width: 336 });
+
+        doc.end();
+    } catch (error) {
+        console.error('Invoice generation error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to generate invoice' });
+        }
     }
 });
 

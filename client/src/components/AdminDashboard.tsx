@@ -17,13 +17,14 @@ import {
     createUser,
     fetchPermissions,
     updatePermissions,
-    acceptReview
+    acceptReview,
+    downloadInvoice
 } from '../services/api';
 import type { Order, MenuItem, Category, User, Permission } from '../services/api';
 import { getCurrentUser } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEdit, FaTrash, FaStar, FaCheckCircle } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaStar, FaCheckCircle, FaFilePdf } from 'react-icons/fa';
 import ConfirmModal from './ConfirmModal';
 import InputModal from './InputModal';
 import '../styles/Admin.css';
@@ -371,6 +372,24 @@ const AdminDashboard = () => {
         } catch (error) { showMsg('error', 'Failed to update user role'); }
     };
 
+    const handleDownloadInvoice = async (orderId: number) => {
+        setInputModal({
+            isOpen: true,
+            title: 'Add Delivery Charge',
+            message: 'Enter delivery charge amount (only for this memo):',
+            defaultValue: '0',
+            onSubmit: async (value: string) => {
+                const charge = parseFloat(value) || 0;
+                try {
+                    await downloadInvoice(orderId, charge);
+                    showMsg('success', 'Invoice downloaded successfully');
+                } catch (error: any) {
+                    showMsg('error', error.message || 'Failed to download invoice');
+                }
+            }
+        });
+    };
+
     const handleMenuSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData();
@@ -530,6 +549,14 @@ const AdminDashboard = () => {
                                     <td>
                                         <div className="actions-cell">
                                             <button className="btn-small" onClick={() => setSelectedOrder(order)}>View</button>
+                                            <button 
+                                                className="icon-btn" 
+                                                onClick={() => handleDownloadInvoice(order.id!)} 
+                                                style={{ width: '30px', height: '30px', borderRadius: '6px', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--color-accent)' }} 
+                                                title="Download Invoice"
+                                            >
+                                                <FaFilePdf style={{ width: '14px', height: '14px' }} />
+                                            </button>
                                             {['pending', 'cancelled', 'delivered'].includes((order.status || '').toLowerCase()) && (
                                                 <button className="icon-btn delete" onClick={() => handleDeleteOrder(order.id!)} style={{ width: '30px', height: '30px', borderRadius: '6px' }} title="Delete Order">
                                                     <FaTrash style={{ width: '14px', height: '14px' }} />

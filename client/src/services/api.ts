@@ -331,3 +331,17 @@ export const acceptReview = async (id: number, menuItemIds: number[]) => {
     if (!response.ok) throw new Error(data.error || 'Failed to accept review');
     return data;
 };
+
+export const downloadInvoice = async (orderId: number, deliveryCharge: number = 0) => {
+    const response = await authFetch(`${API_URL}/orders/${orderId}/invoice?deliveryCharge=${deliveryCharge}`);
+    if (!response.ok) throw new Error('Failed to download invoice');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice_${orderId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+};
