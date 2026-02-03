@@ -13,6 +13,7 @@ export interface User {
 
 interface AuthResponse {
     token: string;
+    refreshToken: string;
     user: User;
 }
 
@@ -38,8 +39,17 @@ export const login = async (credentials: any): Promise<AuthResponse> => {
     return data;
 };
 
-export const logout = () => {
+export const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+        await fetch(`${API_URL}/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+        }).catch(err => console.error('Logout failed', err));
+    }
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
 };
 
@@ -52,7 +62,56 @@ export const getToken = (): string | null => {
     return localStorage.getItem('token');
 };
 
-export const saveAuth = (data: AuthResponse) => {
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+export const isValidSession = (): boolean => {
+    const token = getToken();
+    const user = getCurrentUser();
+    return !!(user && token && !isTokenExpired(token));
+};
+
+export const getRefreshToken = (): string | null => {
+    return localStorage.getItem('refreshToken');
+};
+
+export const isTokenExpired = (token: string | null): boolean => {
+    if (!token) return true;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+        return payload.exp < now;
+    } catch (e) {
+        return true;
+    }
+};
+
+export const saveAuth = (data: { token?: string; refreshToken?: string; user?: User }) => {
+    if (data.token) localStorage.setItem('token', data.token);
+    if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+    if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+};
+
+export const refreshAccessToken = async (): Promise<string | null> => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return null;
+
+    try {
+        const response = await fetch(`${API_URL}/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+        });
+        
+        if (!response.ok) {
+            // If refresh fails, logout
+            await logout();
+            return null;
+        }
+
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        return data.token;
+    } catch (error) {
+        console.error('Refresh token failed', error);
+        await logout();
+        return null;
+    }
 };

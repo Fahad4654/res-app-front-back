@@ -130,8 +130,22 @@ function AppContent() {
           } 
         />
 
-        <Route path="/my-orders" element={<MyOrders />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route 
+          path="/my-orders" 
+          element={
+            <ProtectedRoute>
+              <MyOrders />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
 
       <AnimatePresence>

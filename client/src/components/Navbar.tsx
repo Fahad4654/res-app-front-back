@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaShoppingCart, FaBars, FaTimes, FaUser } from 'react-icons/fa';
-import { getCurrentUser, logout } from '../services/auth';
+import { getCurrentUser, logout, getToken, isTokenExpired, refreshAccessToken } from '../services/auth';
 import type { User } from '../services/auth';
 import { Link, useLocation } from 'react-router-dom';
 import '../styles/Navbar.css';
@@ -22,13 +22,35 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
       setScrolled(window.scrollY > 50 || location.pathname !== '/');
     };
     window.addEventListener('scroll', handleScroll);
-    setUser(getCurrentUser());
+    
+    const initAuth = async () => {
+      const currentUser = getCurrentUser();
+      const token = getToken();
+      
+      if (currentUser && token) {
+        if (isTokenExpired(token)) {
+          // Attempt refresh if expired
+          const newToken = await refreshAccessToken();
+          if (!newToken) {
+            setUser(null);
+          } else {
+            setUser(getCurrentUser());
+          }
+        } else {
+          setUser(currentUser);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    initAuth();
     handleScroll(); // Initial check
     return () => window.removeEventListener('scroll', handleScroll);
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     window.location.reload();
   };
 

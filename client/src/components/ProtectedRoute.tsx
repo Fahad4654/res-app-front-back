@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getCurrentUser } from '../services/auth';
+import { getCurrentUser, getToken, isTokenExpired, refreshAccessToken } from '../services/auth';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -7,9 +8,47 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const user = getCurrentUser();
+    const token = getToken();
 
-    if (!user) {
+    useEffect(() => {
+        const checkAuth = async () => {
+            if (!user || !token) {
+                setIsAuthenticated(false);
+                return;
+            }
+
+            if (isTokenExpired(token)) {
+                setIsRefreshing(true);
+                const newToken = await refreshAccessToken();
+                setIsRefreshing(false);
+                setIsAuthenticated(!!newToken);
+            } else {
+                setIsAuthenticated(true);
+            }
+        };
+
+        checkAuth();
+    }, [user, token]);
+
+    if (isAuthenticated === null || isRefreshing) {
+        return (
+            <div style={{ 
+                height: '100vh', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                background: 'var(--color-bg-primary)',
+                color: 'var(--color-accent)'
+            }}>
+                Verifying session...
+            </div>
+        );
+    }
+
+    if (!isAuthenticated || !user) {
         return <Navigate to="/login" replace />;
     }
 
