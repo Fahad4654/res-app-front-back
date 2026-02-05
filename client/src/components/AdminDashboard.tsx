@@ -25,7 +25,7 @@ import type { Order, MenuItem, Category, User, Permission } from '../services/ap
 import { getCurrentUser } from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEdit, FaTrash, FaStar, FaCheckCircle, FaFilePdf } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaStar, FaCheckCircle, FaFilePdf, FaSearch } from 'react-icons/fa';
 import ConfirmModal from './ConfirmModal';
 import InputModal from './InputModal';
 import '../styles/Admin.css';
@@ -37,10 +37,10 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState<User[]>([]);
     
     // Pagination States
-    const [ordersPage, setOrdersPage] = useState({ total: 0, current: 1, totalPages: 1 });
-    const [menuPage, setMenuPage] = useState({ total: 0, current: 1, totalPages: 1 });
-    const [usersPage, setUsersPage] = useState({ total: 0, current: 1, totalPages: 1 });
-    const [categoriesPage, setCategoriesPage] = useState({ total: 0, current: 1, totalPages: 1 });
+    const [ordersPage, setOrdersPage] = useState({ total: 0, current: 1, totalPages: 1, limit: 10 });
+    const [menuPage, setMenuPage] = useState({ total: 0, current: 1, totalPages: 1, limit: 10 });
+    const [usersPage, setUsersPage] = useState({ total: 0, current: 1, totalPages: 1, limit: 10 });
+    const [categoriesPage, setCategoriesPage] = useState({ total: 0, current: 1, totalPages: 1, limit: 10 });
 
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'categories' | 'users' | 'permissions'>('orders');
@@ -112,12 +112,12 @@ const AdminDashboard = () => {
         loadAllData();
     }, [navigate]);
 
-    // Refetch current tab when debounced search, active tab, or sorting changes
+    // Refetch current tab when debounced search, active tab, sorting, or limit changes
     useEffect(() => {
         if (debouncedSearch !== undefined) {
             loadTabData(activeTab, 1);
         }
-    }, [debouncedSearch, activeTab, sortBy, sortOrder]);
+    }, [debouncedSearch, activeTab, sortBy, sortOrder, ordersPage.limit, menuPage.limit, usersPage.limit, categoriesPage.limit]);
 
     useEffect(() => {
         setSelectedTagItems([]);
@@ -177,16 +177,16 @@ const AdminDashboard = () => {
             ]);
             
             setOrders(ordersRes.data);
-            setOrdersPage({ total: ordersRes.total, current: ordersRes.page, totalPages: ordersRes.totalPages });
+            setOrdersPage({ total: ordersRes.total, current: ordersRes.page, totalPages: ordersRes.totalPages, limit: ordersPage.limit });
             
             setMenuItems(menuRes.data);
-            setMenuPage({ total: menuRes.total, current: menuRes.page, totalPages: menuRes.totalPages });
+            setMenuPage({ total: menuRes.total, current: menuRes.page, totalPages: menuRes.totalPages, limit: menuPage.limit });
             
             setCategories(categoriesRes.data);
-            setCategoriesPage({ total: categoriesRes.total, current: categoriesRes.page, totalPages: categoriesRes.totalPages });
+            setCategoriesPage({ total: categoriesRes.total, current: categoriesRes.page, totalPages: categoriesRes.totalPages, limit: categoriesPage.limit });
             
             setUsers(usersRes.data);
-            setUsersPage({ total: usersRes.total, current: usersRes.page, totalPages: usersRes.totalPages });
+            setUsersPage({ total: usersRes.total, current: usersRes.page, totalPages: usersRes.totalPages, limit: usersPage.limit });
 
             setPermissions(permissionsRes);
             setStats(statsRes);
@@ -201,22 +201,23 @@ const AdminDashboard = () => {
     const loadTabData = async (tab: string = activeTab, page: number = 1) => {
         try {
             if (tab === 'orders') {
-                const res = await fetchOrders(page, 10, debouncedSearch, sortBy, sortOrder);
+                const res = await fetchOrders(page, ordersPage.limit, debouncedSearch, sortBy, sortOrder);
                 setOrders(res.data);
-                setOrdersPage({ total: res.total, current: res.page, totalPages: res.totalPages });
+                setOrdersPage({ total: res.total, current: res.page, totalPages: res.totalPages, limit: ordersPage.limit });
             } else if (tab === 'menu') {
-                const res = await fetchMenu(page, 10, 'All', debouncedSearch, sortBy, sortOrder);
+                const res = await fetchMenu(page, menuPage.limit, 'All', debouncedSearch, sortBy, sortOrder);
                 setMenuItems(res.data);
-                setMenuPage({ total: res.total, current: res.page, totalPages: res.totalPages });
+                setMenuPage({ total: res.total, current: res.page, totalPages: res.totalPages, limit: menuPage.limit });
             } else if (tab === 'users') {
-                const res = await fetchUsers(page, 10, debouncedSearch, sortBy, sortOrder);
+                const res = await fetchUsers(page, usersPage.limit, debouncedSearch, sortBy, sortOrder);
                 setUsers(res.data);
-                setUsersPage({ total: res.total, current: res.page, totalPages: res.totalPages });
+                setUsersPage({ total: res.total, current: res.page, totalPages: res.totalPages, limit: usersPage.limit });
             } else if (tab === 'categories') {
-                const res = await fetchCategories(page, 100, debouncedSearch, sortBy, sortOrder);
+                const res = await fetchCategories(page, categoriesPage.limit, debouncedSearch, sortBy, sortOrder);
                 setCategories(res.data);
-                setCategoriesPage({ total: res.total, current: res.page, totalPages: res.totalPages });
-            } else if (tab === 'permissions') {
+                setCategoriesPage({ total: res.total, current: res.page, totalPages: res.totalPages, limit: categoriesPage.limit });
+            }
+ else if (tab === 'permissions') {
                 const res = await fetchPermissions();
                 setPermissions(res);
             }
@@ -556,20 +557,19 @@ const AdminDashboard = () => {
             {/* ORDERS TAB */}
             {activeTab === 'orders' && (
                 <div className="orders-table-wrapper">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <div className="admin-table-filters" style={{ margin: 0 }}>
+                    <div className="support-filter-group" style={{ marginBottom: '1.5rem', justifyContent: 'flex-start' }}>
+                        <div className="support-search">
+                            <FaSearch className="search-icon" />
                             <input 
                                 type="text" 
                                 placeholder="Search name, email, phone or ID..." 
                                 value={searchTerm} 
                                 onChange={e => setSearchTerm(e.target.value)}
                                 className="admin-search-input"
-                                style={{ width: '300px' }}
                             />
                         </div>
                         <select 
                             className="filter-select" 
-                            style={{ padding: '0.6rem 2rem 0.6rem 1rem', fontSize: '0.9rem' }}
                             value={timeFilter}
                             onChange={(e) => setTimeFilter(e.target.value)}
                         >
@@ -577,6 +577,23 @@ const AdminDashboard = () => {
                             <option value="yesterday">Yesterday</option>
                             <option value="7days">Last 7 Days</option>
                             <option value="30days">Last 30 Days</option>
+                        </select>
+                        <select 
+                            className="filter-select" 
+                            style={{ height: 'var(--control-height)' }}
+                            value={activeTab === 'orders' ? ordersPage.limit : activeTab === 'menu' ? menuPage.limit : activeTab === 'users' ? usersPage.limit : categoriesPage.limit}
+                            onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (activeTab === 'orders') setOrdersPage(p => ({ ...p, limit: val, current: 1 }));
+                                else if (activeTab === 'menu') setMenuPage(p => ({ ...p, limit: val, current: 1 }));
+                                else if (activeTab === 'users') setUsersPage(p => ({ ...p, limit: val, current: 1 }));
+                                else if (activeTab === 'categories') setCategoriesPage(p => ({ ...p, limit: val, current: 1 }));
+                            }}
+                        >
+                            <option value="5">5 Per Page</option>
+                            <option value="10">10 Per Page</option>
+                            <option value="20">20 Per Page</option>
+                            <option value="50">50 Per Page</option>
                         </select>
                     </div>
 
@@ -742,14 +759,27 @@ const AdminDashboard = () => {
                         </form>
                     </div>
                     <div className="orders-table-wrapper">
-                        <div className="admin-table-filters">
-                            <input 
-                                type="text" 
-                                placeholder="Search menu items..." 
-                                value={searchTerm} 
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="admin-search-input"
-                            />
+                        <div className="support-filter-group" style={{ marginBottom: '1.5rem' }}>
+                            <div className="support-search" style={{ flexGrow: 1 }}>
+                                <FaSearch className="search-icon" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search menu items..." 
+                                    value={searchTerm} 
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="admin-search-input"
+                                />
+                            </div>
+                            <select 
+                                className="filter-select" 
+                                value={menuPage.limit}
+                                onChange={(e) => setMenuPage(p => ({ ...p, limit: Number(e.target.value), current: 1 }))}
+                            >
+                                <option value="5">5 Per Page</option>
+                                <option value="10">10 Per Page</option>
+                                <option value="20">20 Per Page</option>
+                                <option value="50">50 Per Page</option>
+                            </select>
                         </div>
                         <table className="orders-table">
                             <thead>
@@ -887,14 +917,27 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="orders-table-wrapper">
-                        <div className="admin-table-filters">
-                            <input 
-                                type="text" 
-                                placeholder="Search users..." 
-                                value={searchTerm} 
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="admin-search-input"
-                            />
+                        <div className="support-filter-group" style={{ marginBottom: '1.5rem' }}>
+                            <div className="support-search" style={{ flexGrow: 1 }}>
+                                <FaSearch className="search-icon" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search users..." 
+                                    value={searchTerm} 
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="admin-search-input"
+                                />
+                            </div>
+                            <select 
+                                className="filter-select" 
+                                value={usersPage.limit}
+                                onChange={(e) => setUsersPage(p => ({ ...p, limit: Number(e.target.value), current: 1 }))}
+                            >
+                                <option value="5">5 Per Page</option>
+                                <option value="10">10 Per Page</option>
+                                <option value="20">20 Per Page</option>
+                                <option value="50">50 Per Page</option>
+                            </select>
                         </div>
                         <table className="orders-table">
                             <thead>
@@ -959,6 +1002,28 @@ const AdminDashboard = () => {
                         </form>
                     </div>
                     <div className="orders-table-wrapper">
+                        <div className="support-filter-group" style={{ marginBottom: '1.5rem' }}>
+                            <div className="support-search" style={{ flexGrow: 1 }}>
+                                <FaSearch className="search-icon" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search categories..." 
+                                    value={searchTerm} 
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="admin-search-input"
+                                />
+                            </div>
+                            <select 
+                                className="filter-select" 
+                                value={categoriesPage.limit}
+                                onChange={(e) => setCategoriesPage(p => ({ ...p, limit: Number(e.target.value), current: 1 }))}
+                            >
+                                <option value="5">5 Per Page</option>
+                                <option value="10">10 Per Page</option>
+                                <option value="20">20 Per Page</option>
+                                <option value="50">50 Per Page</option>
+                            </select>
+                        </div>
                         <table className="orders-table">
                             <thead>
                                 <tr>

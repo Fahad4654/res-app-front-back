@@ -1,47 +1,37 @@
 import { useState, useEffect } from 'react';
-import { getToken } from '../services/auth';
-import { updateOrderStatus } from '../services/api';
+import { updateOrderStatus, fetchDeliveryOrders } from '../services/api';
 import type { Order } from '../services/api';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { FaPhone, FaMapMarkerAlt, FaCheck, FaMotorcycle } from 'react-icons/fa';
+import { FaPhone, FaMapMarkerAlt, FaCheck, FaMotorcycle, FaSearch } from 'react-icons/fa';
 import ConfirmModal from './ConfirmModal';
 import '../styles/Delivery.css';
 
 const DeliveryDashboard = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [pagination, setPagination] = useState({ current: 1, totalPages: 1, limit: 10, total: 0 });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ 
         isOpen: false, 
         title: '', 
         message: '', 
         onConfirm: () => {} 
     });
-    const navigate = useNavigate();
 
     useEffect(() => {
-        fetchDeliveryOrders();
-        const interval = setInterval(fetchDeliveryOrders, 30000);
+        loadData(1);
+        const interval = setInterval(() => loadData(pagination.current), 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [searchTerm, sortBy, sortOrder, pagination.limit]);
 
-    const fetchDeliveryOrders = async () => {
+    const loadData = async (page: number = pagination.current) => {
         try {
-            const token = getToken();
-            if (!token) {
-                navigate('/login');
-                return;
-            }
-
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/orders/delivery`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error('Failed to fetch orders');
-            
-            const data = await response.json();
-            setOrders(data);
+            const res = await fetchDeliveryOrders(page, pagination.limit, searchTerm, sortBy, sortOrder);
+            setOrders(res.data);
+            setPagination(prev => ({ ...prev, current: res.page, totalPages: res.totalPages, total: res.total }));
             setLoading(false);
         } catch (error) {
             console.error('Error fetching delivery orders:', error);
@@ -59,14 +49,25 @@ const DeliveryDashboard = () => {
                 try {
                     await updateOrderStatus(id, 'delivered');
                     toast.success('Order delivered!');
-                    setOrders(orders.filter(o => o.id !== id)); // Optimistic remove
-                    fetchDeliveryOrders();
+                    loadData();
                 } catch (error) {
                     console.error(error);
                     toast.error('Failed to update status');
                 }
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
             }
         });
+    };
+
+    const Pagination = () => {
+        if (pagination.totalPages <= 1) return null;
+        return (
+            <div className="pagination delivery-pagination">
+                <button disabled={pagination.current === 1} onClick={() => loadData(pagination.current - 1)}>Prev</button>
+                <span>Page {pagination.current} of {pagination.totalPages}</span>
+                <button disabled={pagination.current === pagination.totalPages} onClick={() => loadData(pagination.current + 1)}>Next</button>
+            </div>
+        );
     };
 
     const readyOrders = orders.filter(o => o.status === 'ready');
@@ -76,100 +77,135 @@ const DeliveryDashboard = () => {
         <div className="delivery-container">
             <header className="delivery-header">
                 <h1>Delivery Dashboard</h1>
+                <div className="delivery-controls">
+                    <div className="support-filter-group">
+                        <div className="support-search">
+                            <FaSearch className="search-icon" />
+                            <input 
+                                type="text" 
+                                placeholder="Search orders..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="admin-search-input"
+                            />
+                        </div>
+                        <div className="sort-controls" style={{ display: 'flex', gap: '1rem' }}>
+                            <select 
+                                className="filter-select"
+                                value={`${sortBy}-${sortOrder}`} 
+                                onChange={(e) => {
+                                    const [field, order] = e.target.value.split('-');
+                                    setSortBy(field);
+                                    setSortOrder(order as any);
+                                }}
+                            >
+                                <option value="date-asc">Oldest First</option>
+                                <option value="date-desc">Newest First</option>
+                                <option value="status-asc">Status</option>
+                            </select>
+                            <select 
+                                className="filter-select"
+                                value={pagination.limit} 
+                                onChange={(e) => setPagination(prev => ({ ...prev, limit: Number(e.target.value), current: 1 }))}
+                            >
+                                <option value="5">5 Per Page</option>
+                                <option value="10">10 Per Page</option>
+                                <option value="20">20 Per Page</option>
+                                <option value="50">50 Per Page</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div className="delivery-stats">
-                    <div className="stat-pill ready">Ready: {readyOrders.length}</div>
-                    <div className="stat-pill out">On Route: {outForDeliveryOrders.length}</div>
+                    <div className="stat-pill total">Active: {pagination.total}</div>
                 </div>
             </header>
 
             {loading ? (
                 <div className="flex-center p-5"><div className="loader"></div></div>
             ) : (
-                <div className="delivery-board">
-                    <section className="delivery-column">
-                        <h2>Ready for Pickup <span className="badge">{readyOrders.length}</span></h2>
-                        <div className="orders-list">
-                            <AnimatePresence>
-                                {readyOrders.map(order => (
-                                    <DeliveryCard 
-                                        key={order.id} 
-                                        order={order} 
-                                        onAction={() => updateOrderStatus(order.id!, 'out_for_delivery').then(fetchDeliveryOrders)}
-                                        actionText="Pick Up"
-                                        actionIcon={<FaMotorcycle />}
-                                        variant="ready"
-                                    />
-                                ))}
-                                {readyOrders.length === 0 && <div className="empty-state">No orders ready</div>}
-                            </AnimatePresence>
-                        </div>
-                    </section>
+                <>
+                    <div className="delivery-board">
+                        <section className="delivery-column">
+                            <h2>Ready for Pickup <span className="badge">{readyOrders.length}</span></h2>
+                            <div className="orders-list">
+                                <AnimatePresence>
+                                    {readyOrders.map(order => (
+                                        <DeliveryCard 
+                                            key={order.id} 
+                                            order={order} 
+                                            onAction={() => updateOrderStatus(order.id!, 'out_for_delivery').then(() => loadData())}
+                                            actionText="Pick Up"
+                                            actionIcon={<FaMotorcycle />}
+                                            variant="ready"
+                                        />
+                                    ))}
+                                    {readyOrders.length === 0 && <div className="empty-state">No orders ready</div>}
+                                </AnimatePresence>
+                            </div>
+                        </section>
 
-                    <section className="delivery-column">
-                        <h2>Out for Delivery <span className="badge">{outForDeliveryOrders.length}</span></h2>
-                        <div className="orders-list">
-                            <AnimatePresence>
-                                {outForDeliveryOrders.map(order => (
-                                    <DeliveryCard 
-                                        key={order.id} 
-                                        order={order} 
-                                        onAction={() => handleDeliveryComplete(order.id!)} 
-                                        actionText="Complete Delivery"
-                                        actionIcon={<FaCheck />}
-                                        variant="out"
-                                    />
-                                ))}
-                                {outForDeliveryOrders.length === 0 && <div className="empty-state">No active deliveries</div>}
-                            </AnimatePresence>
-                        </div>
-                    </section>
-                </div>
+                        <section className="delivery-column">
+                            <h2>Out for Delivery <span className="badge">{outForDeliveryOrders.length}</span></h2>
+                            <div className="orders-list">
+                                <AnimatePresence>
+                                    {outForDeliveryOrders.map(order => (
+                                        <DeliveryCard 
+                                            key={order.id} 
+                                            order={order} 
+                                            onAction={() => handleDeliveryComplete(order.id!)} 
+                                            actionText="Complete Delivery"
+                                            actionIcon={<FaCheck />}
+                                            variant="out"
+                                        />
+                                    ))}
+                                    {outForDeliveryOrders.length === 0 && <div className="empty-state">No active deliveries</div>}
+                                </AnimatePresence>
+                            </div>
+                        </section>
+                    </div>
+                    <Pagination />
+                </>
             )}
 
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
                 title={confirmModal.title}
                 message={confirmModal.message}
-                onConfirm={() => {
-                    confirmModal.onConfirm();
-                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                }}
+                onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
             />
         </div>
     );
 };
 
-const DeliveryCard = ({ order, onAction, actionText, actionIcon, variant }: any) => {
+const DeliveryCard = ({ order, onAction, actionText, actionIcon, variant }: { order: Order, onAction: () => void, actionText: string, actionIcon: React.ReactNode, variant: 'ready' | 'out' }) => {
     return (
         <motion.div 
             layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: -100 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             className={`delivery-card ${variant}`}
         >
             <div className="card-header">
                 <span className="order-id">#{order.id}</span>
-                <div style={{ textAlign: 'right' }}>
-                    <span className="customer-name">{order.customer.name}</span>
-                    {order.deliveryStaff && <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>Driver: {order.deliveryStaff.name}</div>}
-                </div>
+                <span className="customer-name">{order.customer.name}</span>
             </div>
-            
+
             <div className="customer-details">
                 <div className="detail-row">
                     <FaPhone className="icon" />
-                    <a href={`tel:${order.customer.phoneNo}`}>{order.customer.phoneNo || 'No phone'}</a>
+                    <a href={`tel:${order.customer.phoneNo}`}>{order.customer.phoneNo}</a>
                 </div>
                 <div className="detail-row">
                     <FaMapMarkerAlt className="icon" />
-                    <span>{order.customer.address || 'No address provided'}</span>
+                    <span>{order.customer.address}</span>
                 </div>
             </div>
 
             <div className="order-summary">
-                {order.items.length} items • ${order.total}
+                {order.items.length} items • ${Number(order.total).toFixed(2)}
             </div>
 
             <button className={`btn-delivery-action ${variant}`} onClick={onAction}>

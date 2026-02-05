@@ -454,34 +454,67 @@ app.put('/api/orders/:id/status', authenticateToken, checkPermission('orders', '
 
 // Kitchen Staff: Get Active Orders
 app.get('/api/orders/kitchen', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const sortBy = (req.query.sortBy as string) || 'date';
+    const sortOrder = (req.query.sortOrder as string) || 'asc';
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+        OR: [
+            { status: 'pending' },
+            { 
+                status: 'preparing',
+                kitchenStaffId: (req as AuthRequest).user?.userId 
+            }
+        ]
+    };
+
+    if (req.query.search) {
+        const search = req.query.search as string;
+        const searchId = parseInt(search);
+        const searchPattern = `%${search}%`;
+
+        const matchingOrders = await prisma.$queryRaw<{ id: number }[]>`
+            SELECT id FROM "orders"
+            WHERE 
+                customer->>'name' ILIKE ${searchPattern}
+                OR customer->>'email' ILIKE ${searchPattern}
+                OR customer->>'phoneNo' ILIKE ${searchPattern}
+        `;
+        const matches = matchingOrders.map(o => o.id);
+        const whereConditions: any[] = [{ id: { in: matches } }];
+        if (!isNaN(searchId)) whereConditions.push({ id: searchId });
+        
+        where.AND = [{ OR: whereConditions }];
+    }
+
     try {
-        const orders = await prisma.order.findMany({
-            where: {
-                OR: [
-                    { status: 'pending' },
-                    { 
-                        status: 'preparing',
-                        kitchenStaffId: (req as AuthRequest).user?.userId 
-                    }
-                ]
-            },
-            orderBy: { date: 'asc' },
+        const [orders, total] = await Promise.all([
+            prisma.order.findMany({
+                where,
+                orderBy: { [sortBy]: sortOrder },
+                skip,
+                take: limit,
                 include: {
-                    user: {
-                        select: { name: true, phoneNo: true }
-                    },
-                    kitchenStaff: {
-                        select: { name: true }
-                    }
+                    user: { select: { name: true, phoneNo: true } },
+                    kitchenStaff: { select: { name: true } }
                 }
-        });
+            }),
+            prisma.order.count({ where })
+        ]);
         
         const sanitizedOrders = orders.map(order => ({
             ...order,
             total: Number(order.total)
         }));
 
-        res.json(sanitizedOrders);
+        res.json({
+            data: sanitizedOrders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch kitchen orders' });
@@ -490,34 +523,67 @@ app.get('/api/orders/kitchen', authenticateToken, checkPermission('orders', 'vie
 
 // Delivery Staff: Get Active Orders
 app.get('/api/orders/delivery', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const sortBy = (req.query.sortBy as string) || 'date';
+    const sortOrder = (req.query.sortOrder as string) || 'asc';
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+        OR: [
+            { status: 'ready' },
+            { 
+                status: 'out_for_delivery',
+                deliveryStaffId: (req as AuthRequest).user?.userId
+            }
+        ]
+    };
+
+    if (req.query.search) {
+        const search = req.query.search as string;
+        const searchId = parseInt(search);
+        const searchPattern = `%${search}%`;
+
+        const matchingOrders = await prisma.$queryRaw<{ id: number }[]>`
+            SELECT id FROM "orders"
+            WHERE 
+                customer->>'name' ILIKE ${searchPattern}
+                OR customer->>'email' ILIKE ${searchPattern}
+                OR customer->>'phoneNo' ILIKE ${searchPattern}
+        `;
+        const matches = matchingOrders.map(o => o.id);
+        const whereConditions: any[] = [{ id: { in: matches } }];
+        if (!isNaN(searchId)) whereConditions.push({ id: searchId });
+        
+        where.AND = [{ OR: whereConditions }];
+    }
+
     try {
-        const orders = await prisma.order.findMany({
-            where: {
-                OR: [
-                    { status: 'ready' },
-                    { 
-                        status: 'out_for_delivery',
-                        deliveryStaffId: (req as AuthRequest).user?.userId
-                    }
-                ]
-            },
-            orderBy: { date: 'asc' },
+        const [orders, total] = await Promise.all([
+            prisma.order.findMany({
+                where,
+                orderBy: { [sortBy]: sortOrder },
+                skip,
+                take: limit,
                 include: {
-                    user: {
-                        select: { name: true, phoneNo: true, address: true }
-                    },
-                    deliveryStaff: {
-                        select: { name: true }
-                    }
+                    user: { select: { name: true, phoneNo: true, address: true } },
+                    deliveryStaff: { select: { name: true } }
                 }
-        });
+            }),
+            prisma.order.count({ where })
+        ]);
         
         const sanitizedOrders = orders.map(order => ({
             ...order,
             total: Number(order.total)
         }));
 
-        res.json(sanitizedOrders);
+        res.json({
+            data: sanitizedOrders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch delivery orders' });
@@ -969,10 +1035,30 @@ app.get('/api/orders/my-orders', authenticateToken, async (req: Request, res: Re
     const sortOrder = (req.query.sortOrder as string) || 'desc';
     const skip = (page - 1) * limit;
 
+    const where: any = { userId, isDeletedByCustomer: false };
+    if (req.query.search) {
+        const search = req.query.search as string;
+        const searchId = parseInt(search);
+        const searchPattern = `%${search}%`;
+
+        const matchingOrders = await prisma.$queryRaw<{ id: number }[]>`
+            SELECT id FROM "orders"
+            WHERE 
+                customer->>'name' ILIKE ${searchPattern}
+                OR customer->>'email' ILIKE ${searchPattern}
+                OR customer->>'phoneNo' ILIKE ${searchPattern}
+        `;
+        const matches = matchingOrders.map(o => o.id);
+        const whereConditions: any[] = [{ id: { in: matches } }];
+        if (!isNaN(searchId)) whereConditions.push({ id: searchId });
+        
+        where.AND = [{ OR: whereConditions }];
+    }
+
     try {
         const [orders, total] = await Promise.all([
             prisma.order.findMany({
-                where: { userId, isDeletedByCustomer: false },
+                where,
                 orderBy: { [sortBy]: sortOrder },
                 skip,
                 take: limit,
@@ -982,7 +1068,7 @@ app.get('/api/orders/my-orders', authenticateToken, async (req: Request, res: Re
                     review: { select: { id: true, rating: true, comment: true } }
                 }
             }),
-            prisma.order.count({ where: { userId, isDeletedByCustomer: false } })
+            prisma.order.count({ where })
         ]);
         
         const sanitizedOrders = orders.map(order => ({

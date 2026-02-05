@@ -75,13 +75,15 @@
 .status-cancelled { background: rgba(244, 67, 54, 0.2); color: #f44336; }
 
 .status-select {
-    background: rgba(212, 175, 55, 0.15);
+    height: 38px;
+    background: var(--color-accent-soft);
     color: var(--color-accent);
     border: 1px solid rgba(212, 175, 55, 0.3);
-    padding: 0.5rem;
-    border-radius: var(--radius-sm);
+    padding: 0 1rem;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    transition: var(--transition-smooth);
 }
 
 .status-select:focus {
@@ -547,28 +549,6 @@
     background: rgba(255, 255, 255, 0.05);
 }
 
-.admin-table-filters {
-    padding: 1rem;
-    display: flex;
-    justify-content: flex-end;
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.admin-search-input {
-    padding: 0.6rem 1rem;
-    border-radius: 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.2);
-    color: white;
-    width: 250px;
-}
-
-.admin-search-input:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-
 /* Menu Page Controls */
 .menu-controls {
     display: flex;
@@ -587,22 +567,32 @@
 
 .menu-search-input {
     flex-grow: 1;
-    padding: 0.8rem 1.2rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
+    height: var(--control-height);
+    padding: 0 1.5rem;
+    border-radius: var(--control-radius);
+    border: var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
     color: white;
+    transition: var(--transition-smooth);
+    box-shadow: var(--glass-shadow);
+}
+
+.menu-search-input:hover {
+    background: var(--glass-bg-hover);
 }
 
 .menu-sort-select {
-    padding: 0.8rem 1rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    background: rgba(212, 175, 55, 0.15);
+    height: var(--control-height);
+    padding: 0 1.25rem;
+    border-radius: var(--control-radius);
+    border: var(--glass-border);
+    background: var(--color-accent-soft);
     color: var(--color-accent);
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: var(--transition-smooth);
+    backdrop-filter: var(--glass-blur);
 }
 
 .menu-sort-select:focus {

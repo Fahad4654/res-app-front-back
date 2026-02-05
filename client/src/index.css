@@ -5,7 +5,25 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #0c0c0c;
+
+  /* Luxury Control Tokens */
+  --color-accent: #d4af37;
+  --color-accent-soft: rgba(212, 175, 55, 0.15);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0a0a0;
+  --color-bg-primary: #0c0c0c;
+  --color-bg-secondary: #1a1a1a;
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --glass-blur: blur(12px);
+  --control-height: 44px;
+  --control-radius: 12px;
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -65,4 +83,122 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Shared Dashboard Controls */
+.support-filter-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap; /* Enable wrapping for mobile */
+}
+
+@media (max-width: 768px) {
+  .support-filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+}
+
+.support-search {
+  position: relative;
+  flex: 1; /* Allow it to grow */
+  min-width: 250px; /* Minimum width for search */
+}
+
+@media (max-width: 768px) {
+  .support-search {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.support-search .search-icon {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-accent);
+  font-size: 0.9rem;
+  z-index: 10;
+  opacity: 0.8;
+}
+
+.support-search input, .admin-search-input {
+  width: 100%; /* Use 100% of parent */
+  max-width: 350px; /* Cap width on desktop */
+  height: var(--control-height);
+  padding: 0 1rem 0 3.25rem;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  border-radius: var(--control-radius);
+  color: white;
+  font-size: 0.95rem;
+  outline: none;
+  transition: var(--transition-smooth);
+  box-shadow: var(--glass-shadow);
+}
+
+@media (max-width: 768px) {
+  .support-search input, .admin-search-input {
+    max-width: none; /* Full width on mobile */
+  }
+}
+
+.support-search input::placeholder, .admin-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.support-search input:hover, .admin-search-input:hover {
+  background: var(--glass-bg-hover);
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.support-search input:focus, .admin-search-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+  background: var(--glass-bg-hover);
+}
+
+.filter-select {
+  height: var(--control-height);
+  padding: 0 1.5rem;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  border-radius: var(--control-radius);
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d4af37%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.25rem center;
+  background-size: 0.75em auto;
+  padding-right: 3rem;
+  box-shadow: var(--glass-shadow);
+  min-width: 150px;
+}
+
+@media (max-width: 768px) {
+  .filter-select {
+    width: 100%;
+  }
+}
+
+.filter-select:hover {
+  background: var(--glass-bg-hover);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+.filter-select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+  background: var(--glass-bg-hover);
 }

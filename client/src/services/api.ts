@@ -121,8 +121,9 @@ export const placeOrder = async (order: Order): Promise<{ message: string; order
   return response.json();
 };
 
-export const fetchMyOrders = async (page = 1, limit = 10, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<PaginatedResponse<Order>> => {
+export const fetchMyOrders = async (page = 1, limit = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<PaginatedResponse<Order>> => {
   let url = `${API_URL}/orders/my-orders?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
   if (sortBy) url += `&sortBy=${sortBy}`;
   if (sortOrder) url += `&sortOrder=${sortOrder}`;
 
@@ -139,6 +140,28 @@ export const fetchOrders = async (page = 1, limit = 10, search?: string, sortBy?
   
   const response = await authFetch(url);
   if (!response.ok) throw new Error('Failed to fetch orders');
+  return response.json();
+};
+
+export const fetchKitchenOrders = async (page = 1, limit = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<PaginatedResponse<Order>> => {
+  let url = `${API_URL}/orders/kitchen?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (sortBy) url += `&sortBy=${sortBy}`;
+  if (sortOrder) url += `&sortOrder=${sortOrder}`;
+  
+  const response = await authFetch(url);
+  if (!response.ok) throw new Error('Failed to fetch kitchen orders');
+  return response.json();
+};
+
+export const fetchDeliveryOrders = async (page = 1, limit = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<PaginatedResponse<Order>> => {
+  let url = `${API_URL}/orders/delivery?page=${page}&limit=${limit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (sortBy) url += `&sortBy=${sortBy}`;
+  if (sortOrder) url += `&sortOrder=${sortOrder}`;
+  
+  const response = await authFetch(url);
+  if (!response.ok) throw new Error('Failed to fetch delivery orders');
   return response.json();
 };
 

@@ -1,0 +1,33 @@
+/* My Orders Dashboard Polish */
+
+.my-orders-container {
+    padding: clamp(100px, 15vh, 140px) 24px 24px !important;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.my-orders-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: var(--border-subtle);
+    gap: 2rem;
+}
+
+@media (max-width: 992px) {
+    .my-orders-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+}
+
+/* Modal Polishing */
+.my-orders-modal .modal-content {
+    background: var(--color-bg-secondary);
+    border: var(--glass-border);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+}

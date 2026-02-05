@@ -12,19 +12,61 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
-    border-bottom: 2px solid #333;
-    padding-bottom: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: var(--border-subtle);
+    gap: 2rem;
+}
+
+@media (max-width: 992px) {
+    .kitchen-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
 }
 
 .kitchen-header h1 {
     font-size: 2rem;
     margin: 0;
-    color: #ffd700;
+    color: var(--color-accent);
 }
 
 .kitchen-stats {
     display: flex;
     gap: 1rem;
+    align-items: center;
+}
+
+.kitchen-controls {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.kitchen-pagination {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.kitchen-pagination button {
+    background: var(--color-accent, #d4af37);
+    color: #000;
+    border: none;
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.kitchen-pagination button:disabled {
+    background: #444;
+    color: #888;
+    cursor: not-allowed;
 }
 
 .stat-pill {
@@ -40,7 +82,7 @@
 /* Board Layout */
 .kitchen-board {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 2rem;
 }
 

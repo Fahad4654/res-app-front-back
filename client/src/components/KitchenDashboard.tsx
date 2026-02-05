@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { getToken } from '../services/auth';
-import { updateOrderStatus } from '../services/api';
+import { updateOrderStatus, fetchKitchenOrders } from '../services/api';
 import type { Order } from '../services/api';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import InputModal from './InputModal';
+import { FaSearch } from 'react-icons/fa';
 import '../styles/Kitchen.css';
 
 const KitchenDashboard = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [pagination, setPagination] = useState({ current: 1, totalPages: 1, limit: 10, total: 0 });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [inputModal, setInputModal] = useState<{ isOpen: boolean; title: string; message: string; defaultValue: string; onSubmit: (value: string) => void }>({ 
         isOpen: false, 
         title: '', 
@@ -19,30 +22,18 @@ const KitchenDashboard = () => {
         onSubmit: () => {} 
     });
 
-    const navigate = useNavigate();
 
     useEffect(() => {
-        fetchKitchenOrders();
-        const interval = setInterval(fetchKitchenOrders, 30000); // Poll every 30s
+        loadData(1);
+        const interval = setInterval(() => loadData(pagination.current), 30000); // Poll every 30s
         return () => clearInterval(interval);
-    }, []);
+    }, [searchTerm, sortBy, sortOrder, pagination.limit]);
 
-    const fetchKitchenOrders = async () => {
+    const loadData = async (page: number = pagination.current) => {
         try {
-            const token = getToken();
-            if (!token) {
-                navigate('/login');
-                return;
-            }
-
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/orders/kitchen`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error('Failed to fetch orders');
-            
-            const data = await response.json();
-            setOrders(data);
+            const res = await fetchKitchenOrders(page, pagination.limit, searchTerm, sortBy, sortOrder);
+            setOrders(res.data);
+            setPagination(prev => ({ ...prev, current: res.page, totalPages: res.totalPages, total: res.total }));
             setLoading(false);
         } catch (error) {
             console.error('Error fetching kitchen orders:', error);
@@ -76,11 +67,22 @@ const KitchenDashboard = () => {
         try {
             await updateOrderStatus(id, status, estimatedTime);
             toast.success(`Order marked as ${status}`);
-            fetchKitchenOrders();
+            loadData();
         } catch (error) {
             console.error(error);
             toast.error('Failed to update status');
         }
+    };
+
+    const Pagination = () => {
+        if (pagination.totalPages <= 1) return null;
+        return (
+            <div className="pagination kitchen-pagination">
+                <button disabled={pagination.current === 1} onClick={() => loadData(pagination.current - 1)}>Prev</button>
+                <span>Page {pagination.current} of {pagination.totalPages}</span>
+                <button disabled={pagination.current === pagination.totalPages} onClick={() => loadData(pagination.current + 1)}>Next</button>
+            </div>
+        );
     };
 
     const pendingOrders = orders.filter(o => o.status === 'pending');
@@ -90,40 +92,81 @@ const KitchenDashboard = () => {
         <div className="kitchen-container">
             <header className="kitchen-header">
                 <h1>Kitchen Display System</h1>
+                <div className="kitchen-controls">
+                    <div className="support-filter-group">
+                        <div className="support-search">
+                            <FaSearch className="search-icon" />
+                            <input 
+                                type="text" 
+                                placeholder="Search orders..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="admin-search-input"
+                            />
+                        </div>
+                        <div className="sort-controls" style={{ display: 'flex', gap: '1rem' }}>
+                            <select 
+                                className="filter-select"
+                                value={`${sortBy}-${sortOrder}`} 
+                                onChange={(e) => {
+                                    const [field, order] = e.target.value.split('-');
+                                    setSortBy(field);
+                                    setSortOrder(order as any);
+                                }}
+                            >
+                                <option value="date-asc">Oldest First</option>
+                                <option value="date-desc">Newest First</option>
+                                <option value="status-asc">Status</option>
+                            </select>
+                            <select 
+                                className="filter-select"
+                                value={pagination.limit} 
+                                onChange={(e) => setPagination(prev => ({ ...prev, limit: Number(e.target.value), current: 1 }))}
+                            >
+                                <option value="5">5 Per Page</option>
+                                <option value="10">10 Per Page</option>
+                                <option value="20">20 Per Page</option>
+                                <option value="50">50 Per Page</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div className="kitchen-stats">
-                    <div className="stat-pill pending">Pending: {pendingOrders.length}</div>
-                    <div className="stat-pill preparing">Preparing: {preparingOrders.length}</div>
+                    <div className="stat-pill total">Active: {pagination.total}</div>
                 </div>
             </header>
 
             {loading ? (
                 <div className="flex-center p-5"><div className="loader"></div></div>
             ) : (
-                <div className="kitchen-board">
-                    <section className="kitchen-column">
-                        <h2>New Orders <span className="badge">{pendingOrders.length}</span></h2>
-                        <div className="orders-list">
-                            <AnimatePresence>
-                                {pendingOrders.map(order => (
-                                    <OrderCard key={order.id} order={order} onAction={() => handleStatusUpdate(order.id!, 'preparing')} actionText="Start Preparing" />
-                                ))}
-                                {pendingOrders.length === 0 && <div className="empty-state">No pending orders</div>}
-                            </AnimatePresence>
-                        </div>
-                    </section>
+                <>
+                    <div className="kitchen-board">
+                        <section className="kitchen-column">
+                            <h2>New Orders <span className="badge">{pendingOrders.length}</span></h2>
+                            <div className="orders-list">
+                                <AnimatePresence>
+                                    {pendingOrders.map(order => (
+                                        <OrderCard key={order.id} order={order} onAction={() => handleStatusUpdate(order.id!, 'preparing')} actionText="Start Preparing" />
+                                    ))}
+                                    {pendingOrders.length === 0 && <div className="empty-state">No pending orders</div>}
+                                </AnimatePresence>
+                            </div>
+                        </section>
 
-                    <section className="kitchen-column">
-                        <h2>Preparing <span className="badge">{preparingOrders.length}</span></h2>
-                        <div className="orders-list">
-                            <AnimatePresence>
-                                {preparingOrders.map(order => (
-                                    <OrderCard key={order.id} order={order} onAction={() => handleStatusUpdate(order.id!, 'ready')} actionText="Mark Ready" isPreparing />
-                                ))}
-                                {preparingOrders.length === 0 && <div className="empty-state">Nothing performing</div>}
-                            </AnimatePresence>
-                        </div>
-                    </section>
-                </div>
+                        <section className="kitchen-column">
+                            <h2>Preparing <span className="badge">{preparingOrders.length}</span></h2>
+                            <div className="orders-list">
+                                <AnimatePresence>
+                                    {preparingOrders.map(order => (
+                                        <OrderCard key={order.id} order={order} onAction={() => handleStatusUpdate(order.id!, 'ready')} actionText="Mark Ready" isPreparing />
+                                    ))}
+                                    {preparingOrders.length === 0 && <div className="empty-state">Nothing performing</div>}
+                                </AnimatePresence>
+                            </div>
+                        </section>
+                    </div>
+                    <Pagination />
+                </>
             )}
 
             <InputModal

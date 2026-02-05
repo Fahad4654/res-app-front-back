@@ -17,7 +17,8 @@ const SupportDashboard = () => {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [sortBy, setSortBy] = useState('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [pagination, setPagination] = useState({ current: 1, totalPages: 1 });
+    const [pagination, setPagination] = useState({ current: 1, totalPages: 1, total: 0 });
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [stats, setStats] = useState({ pending: 0, preparing: 0, ready: 0, out_for_delivery: 0, delivered: 0 });
     const [timeFilter, setTimeFilter] = useState('today');
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ 
@@ -44,7 +45,7 @@ const SupportDashboard = () => {
 
     useEffect(() => {
         loadData(1);
-    }, [searchTerm, sortBy, sortOrder]);
+    }, [searchTerm, sortBy, sortOrder, rowsPerPage]);
 
     useEffect(() => {
         loadStats();
@@ -57,9 +58,9 @@ const SupportDashboard = () => {
                 navigate('/login');
                 return;
             }
-            const response = await fetchOrders(page, 10, searchTerm, sortBy, sortOrder);
+            const response = await fetchOrders(page, rowsPerPage, searchTerm, sortBy, sortOrder);
             setOrders(response.data);
-            setPagination({ current: response.page, totalPages: response.totalPages });
+            setPagination({ current: response.page, totalPages: response.totalPages, total: response.total });
             setLoading(false);
         } catch (error) {
             console.error('Error fetching orders:', error);
@@ -195,6 +196,16 @@ const SupportDashboard = () => {
                         <option value="yesterday">Yesterday</option>
                         <option value="7days">Last 7 Days</option>
                         <option value="30days">Last 30 Days</option>
+                    </select>
+                    <select 
+                        className="filter-select" 
+                        value={rowsPerPage}
+                        onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                    >
+                        <option value="5">5 Per Page</option>
+                        <option value="10">10 Per Page</option>
+                        <option value="20">20 Per Page</option>
+                        <option value="50">50 Per Page</option>
                     </select>
                     <div className="support-search">
                         <FaSearch className="search-icon" />

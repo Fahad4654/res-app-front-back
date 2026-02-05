@@ -59,65 +59,7 @@
     color: var(--color-accent);
 }
 
-.support-filter-group {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.filter-select {
-    padding: 0.8rem 1.5rem;
-    background: var(--color-bg-secondary);
-    border: var(--border-subtle);
-    border-radius: 50px;
-    color: var(--color-text-primary);
-    font-size: 0.9rem;
-    outline: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d4af37%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    background-size: 0.65em auto;
-    padding-right: 2.5rem;
-}
-
-.filter-select:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
-}
-
-/* Search bar styling */
-.support-search {
-    position: relative;
-    width: 300px;
-}
-
-.support-search .search-icon {
-    position: absolute;
-    left: 1.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-text-secondary);
-}
-
-.support-search input {
-    width: 100%;
-    padding: 0.8rem 1rem 0.8rem 3rem;
-    background: var(--color-bg-secondary);
-    border: var(--border-subtle);
-    border-radius: 50px;
-    color: white;
-    font-size: 0.9rem;
-    outline: none;
-    transition: all 0.2s;
-}
-
-.support-search input:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
-}
+/* Order Board Layout - Table Card */
 
 /* Order Board Layout - Table Card */
 .support-table-card {
