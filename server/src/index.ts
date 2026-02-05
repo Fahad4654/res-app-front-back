@@ -123,6 +123,60 @@ app.put('/api/permissions', authenticateToken, requireAdmin, async (req: Request
 
 // ===== ORDERS API =====
 
+// Admin/Staff: Get Order Statistics
+app.get('/api/orders/stats', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
+    try {
+        let startDate: Date;
+        let endDate: Date;
+
+        if (req.query.startDate && req.query.endDate) {
+            startDate = new Date(req.query.startDate as string);
+            endDate = new Date(req.query.endDate as string);
+        } else {
+            // Default to today
+            startDate = new Date();
+            startDate.setHours(0, 0, 0, 0);
+            
+            endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 1);
+        }
+
+        const stats = await prisma.order.groupBy({
+            by: ['status'],
+            where: {
+                date: {
+                    gte: startDate.toISOString(),
+                    lt: endDate.toISOString()
+                }
+            },
+            _count: {
+                id: true
+            }
+        });
+
+        const formattedStats = {
+            pending: 0,
+            preparing: 0,
+            ready: 0,
+            out_for_delivery: 0,
+            delivered: 0,
+            cancelled: 0
+        };
+
+        stats.forEach(stat => {
+            const statusKey = stat.status.toLowerCase().replace(/\s/g, '_') as keyof typeof formattedStats;
+            if (formattedStats.hasOwnProperty(statusKey)) {
+                formattedStats[statusKey] = stat._count.id;
+            }
+        });
+
+        res.json(formattedStats);
+    } catch (error) {
+        console.error('Error fetching order stats:', error);
+        res.status(500).json({ error: 'Failed to fetch order statistics' });
+    }
+});
+
 // Admin/Staff: Get All Orders with Pagination
 app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
@@ -134,10 +188,29 @@ app.get('/api/orders', authenticateToken, checkPermission('orders', 'view'), asy
     const where: any = {};
     if (req.query.search) {
         const search = req.query.search as string;
-        where.OR = [
-            { customer: { path: ['name'], string_contains: search } },
-            { customer: { path: ['email'], string_contains: search } }
+        const searchId = parseInt(search);
+        const searchPattern = `%${search}%`;
+
+        // Find IDs matching customer fields using raw SQL for case-insensitive JSON search
+        const matchingOrders = await prisma.$queryRaw<{ id: number }[]>`
+            SELECT id FROM "orders"
+            WHERE 
+                customer->>'name' ILIKE ${searchPattern}
+                OR customer->>'email' ILIKE ${searchPattern}
+                OR customer->>'phoneNo' ILIKE ${searchPattern}
+        `;
+
+        const matches = matchingOrders.map(o => o.id);
+        const whereConditions: any[] = [
+            { id: { in: matches } }
         ];
+
+        // Also allow exact ID match if search term is numeric
+        if (!isNaN(searchId)) {
+            whereConditions.push({ id: searchId });
+        }
+
+        where.OR = whereConditions;
     }
 
     let orderBy: any = { [sortBy]: sortOrder };

@@ -18,7 +18,8 @@ import {
     fetchPermissions,
     updatePermissions,
     acceptReview,
-    downloadInvoice
+    downloadInvoice,
+    fetchOrderStats
 } from '../services/api';
 import type { Order, MenuItem, Category, User, Permission } from '../services/api';
 import { getCurrentUser } from '../services/auth';
@@ -61,6 +62,10 @@ const AdminDashboard = () => {
     });
     const [newItemImage, setNewItemImage] = useState<File | null>(null);
     const [useUrl, setUseUrl] = useState(false);
+
+    // Stats State
+    const [stats, setStats] = useState({ pending: 0, preparing: 0, ready: 0, out_for_delivery: 0, delivered: 0 });
+    const [timeFilter, setTimeFilter] = useState('today');
 
     // New Category State
     const [newCatName, setNewCatName] = useState('');
@@ -118,15 +123,57 @@ const AdminDashboard = () => {
         setSelectedTagItems([]);
     }, [selectedOrder]);
 
+    useEffect(() => {
+        loadStats();
+    }, [timeFilter]);
+
+    const getDateRange = (filter: string) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let startDate = new Date(today);
+        let endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+
+        switch (filter) {
+            case 'yesterday':
+                startDate.setDate(startDate.getDate() - 1);
+                endDate.setDate(endDate.getDate() - 1);
+                break;
+            case '7days':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case '30days':
+                startDate.setDate(startDate.getDate() - 30);
+                break;
+            default: // today
+                break;
+        }
+        return { 
+            startDate: startDate.toISOString(), 
+            endDate: endDate.toISOString() 
+        };
+    };
+
+    const loadStats = async () => {
+        try {
+            const { startDate, endDate } = getDateRange(timeFilter);
+            const data = await fetchOrderStats(startDate, endDate);
+            setStats(data);
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
+    };
+
     const loadAllData = async () => {
         setLoading(true);
         try {
-            const [ordersRes, menuRes, categoriesRes, usersRes, permissionsRes] = await Promise.all([
+            const [ordersRes, menuRes, categoriesRes, usersRes, permissionsRes, statsRes] = await Promise.all([
                 fetchOrders(1, 10, debouncedSearch, 'date', 'desc'),
                 fetchMenu(1, 10, 'All', debouncedSearch, 'id', 'asc'),
                 fetchCategories(1, 100, debouncedSearch, 'name', 'asc'),
                 fetchUsers(1, 10, debouncedSearch, 'id', 'asc'),
-                fetchPermissions()
+                fetchPermissions(),
+                fetchOrderStats()
             ]);
             
             setOrders(ordersRes.data);
@@ -142,6 +189,7 @@ const AdminDashboard = () => {
             setUsersPage({ total: usersRes.total, current: usersRes.page, totalPages: usersRes.totalPages });
 
             setPermissions(permissionsRes);
+            setStats(statsRes);
         } catch (error) {
             console.error(error);
             showMsg('error', 'Failed to load data');
@@ -508,6 +556,53 @@ const AdminDashboard = () => {
             {/* ORDERS TAB */}
             {activeTab === 'orders' && (
                 <div className="orders-table-wrapper">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <div className="admin-table-filters" style={{ margin: 0 }}>
+                            <input 
+                                type="text" 
+                                placeholder="Search name, email, phone or ID..." 
+                                value={searchTerm} 
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="admin-search-input"
+                                style={{ width: '300px' }}
+                            />
+                        </div>
+                        <select 
+                            className="filter-select" 
+                            style={{ padding: '0.6rem 2rem 0.6rem 1rem', fontSize: '0.9rem' }}
+                            value={timeFilter}
+                            onChange={(e) => setTimeFilter(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="7days">Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                        </select>
+                    </div>
+
+                    <div className="support-stats" style={{ marginBottom: '2rem' }}>
+                        <div className="stat-card">
+                            <span className="stat-label">Pending</span>
+                            <span className="stat-value" style={{ color: '#e74c3c' }}>{stats.pending || 0}</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-label">Preparing</span>
+                            <span className="stat-value" style={{ color: '#f39c12' }}>{stats.preparing || 0}</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-label">Ready</span>
+                            <span className="stat-value" style={{ color: '#27ae60' }}>{stats.ready || 0}</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-label">On Route</span>
+                            <span className="stat-value" style={{ color: '#9b59b6' }}>{stats.out_for_delivery || 0}</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-label">Delivered</span>
+                            <span className="stat-value" style={{ color: '#2ecc71' }}>{stats.delivered || 0}</span>
+                        </div>
+                    </div>
+
                     <table className="orders-table">
                         <thead>
                             <tr>
@@ -527,7 +622,12 @@ const AdminDashboard = () => {
                                 <tr key={order.id}>
                                     <td>#{order.id}</td>
                                     <td className="small">
-                                        {new Date(order.date || '').toLocaleString()}
+                                        <div>
+                                            {new Date(order.date || '').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </div>
+                                        <div style={{ fontSize: '0.85em', color: '#888' }}>
+                                            {new Date(order.date || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+                                        </div>
                                     </td>
                                     <td>
                                         <div className="fw-bold">{order.customer.name}</div>
@@ -667,7 +767,14 @@ const AdminDashboard = () => {
                                         <td><img src={item.image} style={{width:'40px',height:'40px',borderRadius:'4px',objectFit:'cover'}} alt="" /></td>
                                         <td>{item.name}</td>
                                         <td>${item.price}</td>
-                                        <td className="small">{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</td>
+                                        <td className="small">
+                                            <div>
+                                                {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                                            </div>
+                                            <div style={{ fontSize: '0.85em', color: '#888' }}>
+                                                {item.createdAt ? new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : ''}
+                                            </div>
+                                        </td>
                                         <td className="actions-cell">
                                             <button className="icon-btn edit" onClick={() => {setEditingItem(item); setNewItem({name:item.name, description:item.description, price:item.price.toString(), category:item.category, image:item.image}); setUseUrl(true)}}><FaEdit /></button>
                                             <button className="icon-btn delete" onClick={() => handleDeleteMenuItem(item.id)}><FaTrash /></button>
@@ -811,7 +918,14 @@ const AdminDashboard = () => {
                                             </span>
                                         </td>
                                         <td>{u.phoneNo || '-'}</td>
-                                        <td className="small">{u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</td>
+                                        <td className="small">
+                                            <div>
+                                                {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                                            </div>
+                                            <div style={{ fontSize: '0.85em', color: '#888' }}>
+                                                {u.createdAt ? new Date(u.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : ''}
+                                            </div>
+                                        </td>
                                         <td className="actions-cell">
                                             <button className="btn-small" onClick={() => handlePromoteUser(u.id, u.role)}>
                                                 {u.role === 'ADMIN' ? 'Demote' : 'Promote'}
@@ -857,7 +971,14 @@ const AdminDashboard = () => {
                                 {categories.map(c => (
                                     <tr key={c.id}>
                                         <td>{c.name}</td>
-                                        <td className="small">{c.createdAt ? new Date(c.createdAt).toLocaleString() : '-'}</td>
+                                        <td className="small">
+                                            <div>
+                                                {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                                            </div>
+                                            <div style={{ fontSize: '0.85em', color: '#888' }}>
+                                                {c.createdAt ? new Date(c.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : ''}
+                                            </div>
+                                        </td>
                                         <td className="actions-cell">
                                             <button className="icon-btn edit" onClick={() => {setEditingItem(c); setNewCatName(c.name)}}><FaEdit /></button>
                                             <button className="icon-btn delete" onClick={() => handleDeleteCategory(c.id)}><FaTrash /></button>
@@ -985,7 +1106,7 @@ const AdminDashboard = () => {
                                         </div>
 
                                         <p className="small text-muted" style={{ marginTop: '16px' }}>
-                                            Review Date: {new Date(selectedOrder.review.createdAt || '').toLocaleString()}
+                                            Review Date: {new Date(selectedOrder.review.createdAt || '').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedOrder.review.createdAt || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
                                         </p>
                                     </div>
                                 </div>

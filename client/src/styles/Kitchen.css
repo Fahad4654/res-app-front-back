@@ -1,7 +1,7 @@
 /* Kitchen Dashboard Styles */
 
 .kitchen-container {
-    padding: 2rem;
+    padding: clamp(100px, 15vh, 140px) 2rem 2rem;
     background-color: #1a1a1a;
     min-height: 100vh;
     color: #e0e0e0;

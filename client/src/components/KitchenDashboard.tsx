@@ -154,7 +154,13 @@ const OrderCard = ({ order, onAction, actionText, isPreparing }: { order: Order,
             <div className="card-header">
                 <span className="order-id">#{order.id}</span>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <span className="order-time">{new Date(order.date || '').toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span className="order-time">
+                        {new Date(order.date || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+                        <br/>
+                        <span style={{ fontSize: '0.7em', fontWeight: 'normal' }}>
+                            {new Date(order.date || '').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                    </span>
                     {order.kitchenStaff && <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Prep: {order.kitchenStaff.name}</span>}
                 </div>
             </div>

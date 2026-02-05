@@ -142,6 +142,16 @@ export const fetchOrders = async (page = 1, limit = 10, search?: string, sortBy?
   return response.json();
 };
 
+export const fetchOrderStats = async (startDate?: string, endDate?: string): Promise<any> => {
+  let url = `${API_URL}/orders/stats`;
+  if (startDate && endDate) {
+    url += `?startDate=${startDate}&endDate=${endDate}`;
+  }
+  const response = await authFetch(url);
+  if (!response.ok) throw new Error('Failed to fetch order statistics');
+  return response.json();
+};
+
 export const updateOrderStatus = async (id: number, status: string, estimatedTime?: number): Promise<void> => {
   const response = await authFetch(`${API_URL}/orders/${id}/status`, {
     method: 'PUT',

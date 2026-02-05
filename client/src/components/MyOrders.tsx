@@ -206,7 +206,12 @@ const MyOrders = () => {
                                     <tr key={order.id}>
                                         <td>#{order.id}</td>
                                         <td>
-                                            {new Date(order.date || '').toLocaleString()}
+                                            <div>
+                                                {new Date(order.date || '').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </div>
+                                            <div style={{ fontSize: '0.85em', color: '#888' }}>
+                                                {new Date(order.date || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+                                            </div>
                                         </td>
                                         <td>
                                             <div className="small">
@@ -290,7 +295,7 @@ const MyOrders = () => {
                             <div className="detail-section">
                                 <h4>Order Information</h4>
                                 <div className="customer-card">
-                                    <p><span>Date:</span> {new Date(selectedOrder.date || '').toLocaleString()}</p>
+                                    <p><span>Date:</span> {new Date(selectedOrder.date || '').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedOrder.date || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</p>
                                     <p><span>Status:</span> {selectedOrder.status}</p>
                                 </div>
                             </div>

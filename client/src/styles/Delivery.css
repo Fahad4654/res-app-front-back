@@ -1,7 +1,7 @@
 /* Delivery Dashboard Styles */
 
 .delivery-container {
-    padding: 2rem;
+    padding: clamp(100px, 15vh, 140px) 2rem 2rem;
     background-color: var(--color-bg-primary);
     min-height: 100vh;
     color: var(--color-text-primary);
