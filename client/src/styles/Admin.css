@@ -1,9 +1,11 @@
 .admin-container {
     padding-top: clamp(100px, 15vh, 140px) !important;
     padding-bottom: clamp(2rem, 5vh, 4rem);
-    padding-left: clamp(0.5rem, 2vw, 1rem);
-    padding-right: clamp(0.5rem, 2vw, 1rem);
+    padding-left: clamp(1rem, 5vw, 3rem);
+    padding-right: clamp(1rem, 5vw, 3rem);
     min-height: 100vh;
+    max-width: 100% !important;
+    width: 100% !important;
 }
 
 .section-title {

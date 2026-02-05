@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../services/auth';
-import { fetchOrders, cancelOrder, fetchOrderStats } from '../services/api';
+import { fetchOrders, cancelOrder, fetchOrderStats, downloadInvoice } from '../services/api';
 import type { Order } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { FaBan, FaSearch, FaEye } from 'react-icons/fa';
+import { FaBan, FaSearch, FaEye, FaFilePdf } from 'react-icons/fa';
 import ConfirmModal from './ConfirmModal';
+import InputModal from './InputModal';
 import '../styles/Support.css';
 
 const SupportDashboard = () => {
@@ -24,6 +25,19 @@ const SupportDashboard = () => {
         title: '', 
         message: '', 
         onConfirm: () => {} 
+    });
+    const [inputModal, setInputModal] = useState<{ 
+        isOpen: boolean; 
+        title: string; 
+        message: string; 
+        defaultValue: string; 
+        onSubmit: (value: string) => void 
+    }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '', 
+        defaultValue: '0',
+        onSubmit: () => {} 
     });
 
     const navigate = useNavigate();
@@ -113,6 +127,24 @@ const SupportDashboard = () => {
                     loadStats(); 
                 } catch (error: any) {
                     toast.error(error.message || 'Failed to cancel order');
+                }
+            }
+        });
+    };
+
+    const handleDownloadInvoice = async (orderId: number) => {
+        setInputModal({
+            isOpen: true,
+            title: 'Add Delivery Charge',
+            message: 'Enter delivery charge amount (only for this memo):',
+            defaultValue: '0',
+            onSubmit: async (value: string) => {
+                const charge = parseFloat(value) || 0;
+                try {
+                    await downloadInvoice(orderId, charge);
+                    toast.success('Invoice downloaded successfully');
+                } catch (error: any) {
+                    toast.error(error.message || 'Failed to download invoice');
                 }
             }
         });
@@ -252,6 +284,14 @@ const SupportDashboard = () => {
                                                 <button className="icon-btn view" onClick={() => setSelectedOrder(order)} title="View Details">
                                                     <FaEye />
                                                 </button>
+                                                <button 
+                                                    className="icon-btn" 
+                                                    onClick={() => handleDownloadInvoice(order.id!)} 
+                                                    style={{ background: 'rgba(212, 175, 55, 0.1)', color: 'var(--color-accent)' }} 
+                                                    title="Download Invoice"
+                                                >
+                                                    <FaFilePdf />
+                                                </button>
                                                 {order.status !== 'cancelled' && order.status !== 'delivered' && (
                                                     <button className="icon-btn delete" onClick={() => handleCancelOrder(order.id!)} title="Cancel Order">
                                                         <FaBan />
@@ -283,6 +323,19 @@ const SupportDashboard = () => {
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                 }}
                 onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+            />
+
+            <InputModal
+                isOpen={inputModal.isOpen}
+                title={inputModal.title}
+                message={inputModal.message}
+                defaultValue={inputModal.defaultValue}
+                onSubmit={(val) => {
+                    inputModal.onSubmit(val);
+                    setInputModal(prev => ({ ...prev, isOpen: false }));
+                }}
+                onCancel={() => setInputModal(prev => ({ ...prev, isOpen: false }))}
+                inputType="number"
             />
         </div>
     );
